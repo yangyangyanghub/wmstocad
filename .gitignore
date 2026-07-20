@@ -21,5 +21,7 @@ Thumbs.db
 # Logs
 *.log
 
-# POC (not merged to production)
-poc/
+# POC code (not merged to production), but keep reports
+poc/webview2-poc/
+poc/wps-poc/
+poc/cors-test/
