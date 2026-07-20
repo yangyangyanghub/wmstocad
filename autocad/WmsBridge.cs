@@ -20,7 +20,7 @@ namespace WmsMapPlugin
   /// - 日志写入
   /// - layers.json 配置读取与发送
   /// </summary>
-  public class WmsBridge
+  public class WmsBridge : IDisposable
   {
     private readonly WebView2 webView;
     private readonly JavaScriptSerializer jsonSerializer;
@@ -28,6 +28,8 @@ namespace WmsMapPlugin
     private readonly string layersJsonPath;
     private readonly object logLock = new object();
     private readonly WmsImageInserter imageInserter;
+    private FileSystemWatcher layersWatcher;
+    private DateTime lastLayersNotify = DateTime.MinValue;
 
     /// <summary>
     /// 创建通信桥实例
@@ -55,6 +57,9 @@ namespace WmsMapPlugin
 
       // 初始化图片插入器，日志回调使用 WriteLog
       this.imageInserter = new WmsImageInserter((level, msg) => WriteLog(level, msg));
+
+      // 启动 layers.json 文件监控
+      StartLayersWatcher();
     }
 
     /// <summary>
@@ -101,6 +106,9 @@ namespace WmsMapPlugin
             break;
           case "insertImage":
             HandleInsertImage(message);
+            break;
+          case "refresh":
+            HandleRefresh(message);
             break;
           default:
             WriteLog("WARN", "未知消息类型: " + type);
@@ -334,6 +342,92 @@ namespace WmsMapPlugin
           { "success", false },
           { "message", "插入失败: " + ex.Message }
         }));
+      }
+    }
+
+    /// <summary>
+    /// 处理前端刷新配置请求：重新读取 layers.json 并发送
+    /// </summary>
+    private void HandleRefresh(Dictionary<string, object> message)
+    {
+      WriteLog("INFO", "收到前端刷新配置请求");
+      SendLayersConfig();
+    }
+
+    /// <summary>
+    /// 启动 FileSystemWatcher 监控 layers.json 变化
+    /// 文件变化时自动重新读取并发送给前端
+    /// </summary>
+    private void StartLayersWatcher()
+    {
+      try
+      {
+        string watchDir = Path.GetDirectoryName(layersJsonPath);
+        string watchFile = Path.GetFileName(layersJsonPath);
+
+        if (!Directory.Exists(watchDir))
+        {
+          WriteLog("WARN", "layers.json 监控目录不存在: " + watchDir);
+          return;
+        }
+
+        layersWatcher = new FileSystemWatcher(watchDir, watchFile)
+        {
+          NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size,
+          EnableRaisingEvents = true
+        };
+
+        layersWatcher.Changed += OnLayersFileChanged;
+        WriteLog("INFO", "已启动 layers.json 文件监控: " + layersJsonPath);
+      }
+      catch (Exception ex)
+      {
+        WriteLog("WARN", "启动 layers.json 监控失败: " + ex.Message);
+      }
+    }
+
+    /// <summary>
+    /// layers.json 文件变化回调，防抖后重新发送配置到前端
+    /// </summary>
+    private void OnLayersFileChanged(object sender, FileSystemEventArgs e)
+    {
+      // 防抖：1 秒内只触发一次
+      if ((DateTime.Now - lastLayersNotify).TotalSeconds < 1)
+      {
+        return;
+      }
+      lastLayersNotify = DateTime.Now;
+
+      try
+      {
+        WriteLog("INFO", "检测到 layers.json 变化，自动刷新配置");
+        SendLayersConfig();
+      }
+      catch (Exception ex)
+      {
+        WriteLog("ERROR", "自动刷新配置失败: " + ex.Message);
+      }
+    }
+
+    /// <summary>
+    /// 释放资源，停止文件监控
+    /// </summary>
+    public void Dispose()
+    {
+      try
+      {
+        if (layersWatcher != null)
+        {
+          layersWatcher.Changed -= OnLayersFileChanged;
+          layersWatcher.EnableRaisingEvents = false;
+          layersWatcher.Dispose();
+          layersWatcher = null;
+          WriteLog("INFO", "layers.json 文件监控已停止");
+        }
+      }
+      catch (Exception ex)
+      {
+        WriteLog("WARN", "停止文件监控异常: " + ex.Message);
       }
     }
 

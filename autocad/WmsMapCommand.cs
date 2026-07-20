@@ -2,6 +2,7 @@
 // TODO: 引用 AutoCAD API 后，删除下方 Stubs 区域，改用 using Autodesk.AutoCAD.Runtime;
 
 using System;
+using System.IO;
 using Autodesk.AutoCAD.Runtime;
 using Autodesk.AutoCAD.Windows;
 
@@ -141,12 +142,32 @@ namespace WmsMapPlugin
     // 面板单例，避免重复创建
     private static WmsPanel panel;
 
+    // 日志文件路径
+    private static string logFilePath;
+    private static readonly object logLock = new object();
+
     /// <summary>
     /// 插件初始化，AutoCAD 加载插件时调用
     /// </summary>
     public void Initialize()
     {
-      // 插件加载时不自动创建面板，等待 WMSMAP 命令触发
+      InitLog();
+      WriteLog("INFO", "========== WMS 插件启动 ==========");
+      WriteLog("INFO", "启动时间: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+      WriteLog("INFO", "插件版本: 1.0.0");
+
+      try
+      {
+        var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
+        if (doc != null)
+        {
+          doc.Editor.WriteMessage("\n[WMS] 插件已加载，输入 WMSMAP 打开地图面板");
+        }
+      }
+      catch (Exception ex)
+      {
+        WriteLog("WARN", "命令行提示失败: " + ex.Message);
+      }
     }
 
     /// <summary>
@@ -154,7 +175,17 @@ namespace WmsMapPlugin
     /// </summary>
     public void Terminate()
     {
-      panel?.Dispose();
+      WriteLog("INFO", "关闭时间: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+      WriteLog("INFO", "========== WMS 插件关闭 ==========");
+
+      try
+      {
+        panel?.Dispose();
+      }
+      catch (Exception ex)
+      {
+        WriteLog("ERROR", "面板释放异常: " + ex.ToString());
+      }
       panel = null;
     }
 
@@ -164,16 +195,78 @@ namespace WmsMapPlugin
     [CommandMethod("WMSMAP")]
     public void WmsMapCommandMethod()
     {
-      if (panel != null)
-      {
-        // 面板已存在，显示并激活
-        panel.Visible = true;
-        return;
-      }
+      WriteLog("INFO", "WMSMAP 命令被调用");
 
-      // 创建新面板实例
-      panel = new WmsPanel();
-      panel.Visible = true;
+      try
+      {
+        if (panel != null)
+        {
+          // 面板已存在，显示并激活
+          panel.Visible = true;
+          WriteLog("INFO", "面板已存在，已激活显示");
+          return;
+        }
+
+        // 创建新面板实例
+        panel = new WmsPanel();
+        panel.Visible = true;
+        WriteLog("INFO", "面板已创建并显示");
+      }
+      catch (Exception ex)
+      {
+        WriteLog("ERROR", "WMSMAP 命令执行异常: " + ex.ToString());
+        try
+        {
+          var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
+          if (doc != null)
+          {
+            doc.Editor.WriteMessage("\n[WMS 错误] 打开面板失败: " + ex.Message);
+          }
+        }
+        catch { }
+      }
+    }
+
+    /// <summary>
+    /// 初始化日志文件路径
+    /// </summary>
+    private static void InitLog()
+    {
+      try
+      {
+        string dllDir = Path.GetDirectoryName(typeof(WmsMapCommand).Assembly.Location);
+        string logDir = Path.Combine(dllDir, "logs");
+        if (!Directory.Exists(logDir))
+        {
+          Directory.CreateDirectory(logDir);
+        }
+        logFilePath = Path.Combine(logDir, "autocad-plugin.log");
+      }
+      catch
+      {
+        // 日志初始化失败不影响主流程
+      }
+    }
+
+    /// <summary>
+    /// 写入日志文件
+    /// </summary>
+    private static void WriteLog(string level, string message)
+    {
+      try
+      {
+        if (string.IsNullOrEmpty(logFilePath)) return;
+        string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+        string logLine = string.Format("[{0}] [{1}] {2}", timestamp, level, message);
+        lock (logLock)
+        {
+          File.AppendAllText(logFilePath, logLine + Environment.NewLine, System.Text.Encoding.UTF8);
+        }
+      }
+      catch
+      {
+        // 日志写入失败不应影响主流程
+      }
     }
   }
 }

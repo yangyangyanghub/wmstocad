@@ -63,14 +63,18 @@ namespace WmsMapPlugin
       {
         await webView.EnsureCoreWebView2Async();
       }
-      catch (Exception)
+      catch (Exception ex)
       {
-        // 初始化失败，不加载页面
+        // 初始化失败，显示错误提示
+        ShowCrashNotice("地图组件初始化失败: " + ex.Message);
         return;
       }
 
       // 允许 file:// 协议下的脚本执行
       webView.CoreWebView2.Settings.IsScriptEnabled = true;
+
+      // 注册 WebView2 进程崩溃检测
+      webView.CoreWebView2.ProcessFailed += OnWebViewProcessFailed;
 
       // 创建通信桥并注册消息接收事件
       bridge = new WmsBridge(webView);
@@ -91,20 +95,84 @@ namespace WmsMapPlugin
     }
 
     /// <summary>
+    /// WebView2 进程崩溃回调，显示恢复提示
+    /// </summary>
+    private void OnWebViewProcessFailed(object sender, CoreWebView2ProcessFailedEventArgs e)
+    {
+      ShowCrashNotice("地图组件异常，请关闭面板重新打开");
+    }
+
+    /// <summary>
+    /// 在 AutoCAD 命令行显示崩溃/异常提示
+    /// </summary>
+    private void ShowCrashNotice(string message)
+    {
+      try
+      {
+        var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
+        if (doc != null)
+        {
+          doc.Editor.WriteMessage("\n[WMS] " + message);
+        }
+      }
+      catch
+      {
+        // 提示失败不影响主流程
+      }
+
+      // 同时在面板中显示提示
+      try
+      {
+        if (webView != null && webView.IsHandleCreated)
+        {
+          webView.Visible = false;
+          var noticeLabel = new Label
+          {
+            Text = message,
+            Dock = DockStyle.Fill,
+            TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
+            Font = new System.Drawing.Font("Microsoft YaHei", 12),
+            ForeColor = System.Drawing.Color.DarkRed,
+            BackColor = System.Drawing.Color.White
+          };
+          // 清除现有控件，显示提示标签
+          var container = webView.Parent;
+          if (container != null)
+          {
+            container.Controls.Clear();
+            container.Controls.Add(noticeLabel);
+          }
+        }
+      }
+      catch
+      {
+        // UI 更新失败不影响主流程
+      }
+    }
+
+    /// <summary>
     /// 释放资源
     /// </summary>
     public new void Dispose()
     {
       if (webView != null)
       {
-        if (webView.CoreWebView2 != null && bridge != null)
+        if (webView.CoreWebView2 != null)
         {
-          webView.CoreWebView2.WebMessageReceived -= bridge.OnWebMessageReceived;
+          webView.CoreWebView2.ProcessFailed -= OnWebViewProcessFailed;
+          if (bridge != null)
+          {
+            webView.CoreWebView2.WebMessageReceived -= bridge.OnWebMessageReceived;
+          }
         }
         webView.Dispose();
         webView = null;
       }
-      bridge = null;
+      if (bridge != null)
+      {
+        bridge.Dispose();
+        bridge = null;
+      }
       base.Dispose();
     }
   }
