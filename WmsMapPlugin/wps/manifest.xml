@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <id>WmsMapPlugin</id>
+  <version>1.0.0</version>
+  <name>WMS 地图插件</name>
+  <description>在 WPS PPT 中打开可交互地图，支持图层切换、投影转换和地图插入</description>
+  <platform>wps</platform>
+  <author>WMS Map Plugin Team</author>
+  <homepage>https://github.com/example/wms-map-plugin</homepage>
+  <minWpsVersion>2019</minWpsVersion>
+</manifest>

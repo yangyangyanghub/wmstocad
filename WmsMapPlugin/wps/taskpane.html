@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WMS 地图</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+      min-width: 300px;
+    }
+
+    #taskpane-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #map-frame {
+      flex: 1;
+      width: 100%;
+      border: none;
+    }
+
+    #loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: calc(100% - 24px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.9);
+      z-index: 10;
+      font-size: 14px;
+      color: #666;
+    }
+
+    #loading-overlay.hidden {
+      display: none;
+    }
+
+    #status-bar {
+      height: 24px;
+      line-height: 24px;
+      padding: 0 8px;
+      background: #f0f0f0;
+      border-top: 1px solid #ccc;
+      font-size: 12px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div id="taskpane-container">
+    <div id="loading-overlay">地图加载中...</div>
+    <iframe id="map-frame" src="../shared/map.html"></iframe>
+    <div id="status-bar">就绪</div>
+  </div>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+{
+  "services": [
+    {
+      "id": "dom202605y2m18level",
+      "name": "DOM 2026年5月 18级",
+      "url": "http://61.240.150.90:8088/mixserver/services/map-ugcv5-dom202605y2m18level/wms111/dom202605y2m18level?",
+      "version": "1.1.1",
+      "srs": "EPSG:4490",
+      "format": "image/png",
+      "bbox": {
+        "minx": 113.4515533010966,
+        "miny": 36.04214231457183,
+        "maxx": 115.49902771933739,
+        "maxy": 37.02216653756615
+      },
+      "layers": [
+        {
+          "name": "0",
+          "title": "DOM 底图",
+          "queryable": true
+        }
+      ]
+    }
+  ],
+  "defaultProjection": {
+    "epsg": "EPSG:4534",
+    "name": "CGCS2000 / 3度带 114°E",
+    "proj4": "+proj=tmerc +lat_0=0 +lon_0=114 +k=1 +x_0=38500000 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs"
+  },
+  "availableProjections": [
+    {
+      "epsg": "EPSG:4490",
+      "name": "CGCS2000 (经纬度)",
+      "proj4": "+proj=longlat +ellps=GRS80 +no_defs +type=crs",
+      "unit": "度"
+    },
+    {
+      "epsg": "EPSG:4534",
+      "name": "CGCS2000 / 3度带 114°E",
+      "proj4": "+proj=tmerc +lat_0=0 +lon_0=114 +k=1 +x_0=38500000 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs",
+      "unit": "米"
+    },
+    {
+      "epsg": "EPSG:4535",
+      "name": "CGCS2000 / 3度带 117°E",
+      "proj4": "+proj=tmerc +lat_0=0 +lon_0=117 +k=1 +x_0=39500000 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs",
+      "unit": "米"
+    },
+    {
+      "epsg": "EPSG:4536",
+      "name": "CGCS2000 / 3度带 120°E",
+      "proj4": "+proj=tmerc +lat_0=0 +lon_0=120 +k=1 +x_0=40500000 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs",
+      "unit": "米"
+    },
+    {
+      "epsg": "EPSG:3857",
+      "name": "Web 墨卡托",
+      "proj4": "+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +no_defs +type=crs",
+      "unit": "米"
+    }
+  ]
+}

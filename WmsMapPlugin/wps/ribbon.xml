@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"
+          onLoad="onRibbonLoad">
+  <ribbon>
+    <tabs>
+      <tab id="wmsMapTab" label="WMS地图">
+        <group id="mapGroup" label="地图操作">
+          <button id="openMap"
+                  label="打开地图"
+                  onAction="openMapPane"
+                  imageMso="MapPin"
+                  size="large"
+                  screentip="打开WMS地图任务窗格"
+                  supertip="在右侧打开可交互的WMS地图面板，支持图层切换、投影转换和地图浏览。"/>
+          <button id="insertMap"
+                  label="插入地图"
+                  onAction="insertMapImage"
+                  getEnabled="getInsertMapEnabled"
+                  imageMso="PictureInsert"
+                  size="large"
+                  screentip="将当前地图视图插入幻灯片"
+                  supertip="截取当前地图视图并插入到当前幻灯片中，图片自动居中并保持宽高比。需先打开地图面板。"/>
+        </group>
+        <group id="configGroup" label="配置">
+          <button id="refreshConfig"
+                  label="刷新配置"
+                  onAction="refreshLayersConfig"
+                  imageMso="Refresh"
+                  size="normal"
+                  screentip="重新加载图层配置"
+                  supertip="重新读取 shared/layers.json 配置文件，更新图层列表和投影信息。修改配置后点击此按钮使更改生效。"/>
+          <button id="aboutPlugin"
+                  label="关于"
+                  onAction="showAbout"
+                  imageMso="Info"
+                  size="normal"
+                  screentip="关于WMS地图插件"
+                  supertip="查看插件版本、兼容性信息和帮助链接。"/>
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>
