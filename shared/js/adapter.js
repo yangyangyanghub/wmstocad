@@ -45,6 +45,11 @@
     sendToHost({ type: 'image', data: base64Data, filename: filename || 'output.png' });
   }
 
+  // 发送插入图片请求到 C#（插入到 CAD 模型空间）
+  function sendInsertImage(base64Data, filename) {
+    sendToHost({ type: 'insertImage', data: base64Data, filename: filename || 'insert.png' });
+  }
+
   // 接收来自 C# 宿主的消息
   // C# 通过 ExecuteScriptAsync 调用 window.receiveFromHost(jsonString)
   window.receiveFromHost = function(jsonString) {
@@ -61,6 +66,9 @@
           break;
         case 'imageSaved':
           handleImageSaved(message);
+          break;
+        case 'insertResult':
+          handleInsertResult(message);
           break;
         case 'error':
           handleHostError(message);
@@ -120,6 +128,21 @@
     sendLog('INFO', '图片保存成功: ' + (message.path || ''));
   }
 
+  // 处理插入 CAD 结果消息
+  function handleInsertResult(message) {
+    if (message.success) {
+      var dimInfo = '';
+      if (message.widthMm && message.heightMm) {
+        dimInfo = ' (' + message.widthMm.toFixed(1) + 'mm x ' + message.heightMm.toFixed(1) + 'mm)';
+      }
+      setStatus('图片已插入到 CAD' + dimInfo);
+      sendLog('INFO', '图片插入成功' + dimInfo);
+    } else {
+      setStatus('插入失败: ' + (message.message || '未知错误'), true);
+      sendLog('ERROR', '图片插入失败: ' + (message.message || ''));
+    }
+  }
+
   // 处理宿主错误消息
   function handleHostError(message) {
     setStatus(message.message || '宿主错误', true);
@@ -144,6 +167,7 @@
     sendLog: sendLog,
     sendError: sendError,
     sendImage: sendImage,
+    sendInsertImage: sendInsertImage,
     getHostConfig: function() { return window.wmsHostConfig || null; }
   };
 
@@ -151,6 +175,7 @@
   function bindOutputEvents() {
     var btnGetmap = document.getElementById('btn-getmap');
     var btnScreenshot = document.getElementById('btn-screenshot');
+    var btnInsertMap = document.getElementById('btn-insert-map');
 
     if (btnGetmap && isHosted) {
       // 在原有点击事件后追加发送逻辑
@@ -190,6 +215,51 @@
             }
           }
         }, 100);
+      });
+    }
+
+    // 绑定"插入地图到 CAD"按钮
+    if (btnInsertMap && isHosted) {
+      btnInsertMap.addEventListener('click', function() {
+        setStatus('正在生成图片并插入到 CAD...');
+        btnInsertMap.disabled = true;
+
+        // 使用 GetMap 出图获取高质量图片
+        var getMapPromise;
+        if (window.getMapImageBase64) {
+          getMapPromise = window.getMapImageBase64();
+        } else {
+          // 降级：使用 html2canvas 截图
+          getMapPromise = new Promise(function(resolve, reject) {
+            if (typeof html2canvas !== 'undefined') {
+              var mapEl = document.getElementById('map');
+              if (mapEl) {
+                html2canvas(mapEl, { useCORS: true, allowTaint: true })
+                  .then(function(canvas) {
+                    resolve(canvas.toDataURL('image/png'));
+                  })
+                  .catch(reject);
+              } else {
+                reject(new Error('地图元素不存在'));
+              }
+            } else {
+              reject(new Error('html2canvas 未加载'));
+            }
+          });
+        }
+
+        getMapPromise
+          .then(function(base64) {
+            var timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            sendInsertImage(base64, 'insert-' + timestamp + '.png');
+          })
+          .catch(function(err) {
+            sendError('插入地图失败: ' + err.message);
+            setStatus('插入失败: ' + err.message, true);
+          })
+          .finally(function() {
+            btnInsertMap.disabled = false;
+          });
       });
     }
   }

@@ -27,6 +27,7 @@ namespace WmsMapPlugin
     private readonly string logFilePath;
     private readonly string layersJsonPath;
     private readonly object logLock = new object();
+    private readonly WmsImageInserter imageInserter;
 
     /// <summary>
     /// 创建通信桥实例
@@ -51,6 +52,9 @@ namespace WmsMapPlugin
       // DLL 位于 autocad/bin/ 下，shared/ 在项目根目录
       string projectRoot = Path.GetFullPath(Path.Combine(dllDir, "..", ".."));
       this.layersJsonPath = Path.Combine(projectRoot, "shared", "layers.json");
+
+      // 初始化图片插入器，日志回调使用 WriteLog
+      this.imageInserter = new WmsImageInserter((level, msg) => WriteLog(level, msg));
     }
 
     /// <summary>
@@ -94,6 +98,9 @@ namespace WmsMapPlugin
             break;
           case "image":
             HandleImage(message);
+            break;
+          case "insertImage":
+            HandleInsertImage(message);
             break;
           default:
             WriteLog("WARN", "未知消息类型: " + type);
@@ -214,12 +221,13 @@ namespace WmsMapPlugin
     }
 
     /// <summary>
-    /// 处理图片消息：保存 base64 图片数据
+    /// 处理图片消息：保存 base64 图片数据并插入 CAD 模型空间
     /// </summary>
     private void HandleImage(Dictionary<string, object> message)
     {
       string base64Data = message.ContainsKey("data") ? message["data"] as string : null;
       string filename = message.ContainsKey("filename") ? message["filename"] as string : "output.png";
+      bool autoInsert = message.ContainsKey("autoInsert") && Convert.ToBoolean(message["autoInsert"]);
 
       if (string.IsNullOrEmpty(base64Data))
       {
@@ -250,17 +258,82 @@ namespace WmsMapPlugin
         File.WriteAllBytes(outputPath, imageBytes);
         WriteLog("INFO", "图片已保存: " + outputPath);
 
-        // 通知前端保存成功
+        // 构造返回结果
         var result = new Dictionary<string, object>
         {
           { "type", "imageSaved" },
           { "path", outputPath }
         };
+
+        // 如果 autoInsert 为 true 或消息来自"插入地图"按钮，则插入到 CAD
+        if (autoInsert)
+        {
+          var insertResult = imageInserter.InsertImage(base64Data, filename);
+          result["inserted"] = insertResult.Success;
+          result["insertMessage"] = insertResult.Message;
+          if (insertResult.Success)
+          {
+            result["widthMm"] = insertResult.WidthMm;
+            result["heightMm"] = insertResult.HeightMm;
+          }
+        }
+
         SendToJs(jsonSerializer.Serialize(result));
       }
       catch (Exception ex)
       {
         WriteLog("ERROR", "保存图片失败: " + ex.Message);
+      }
+    }
+
+    /// <summary>
+    /// 处理插入图片到 CAD 消息：将 base64 图片数据插入到模型空间
+    /// </summary>
+    private void HandleInsertImage(Dictionary<string, object> message)
+    {
+      string base64Data = message.ContainsKey("data") ? message["data"] as string : null;
+      string filename = message.ContainsKey("filename") ? message["filename"] as string : "insert.png";
+
+      if (string.IsNullOrEmpty(base64Data))
+      {
+        WriteLog("WARN", "插入图片消息缺少数据");
+        SendToJs(jsonSerializer.Serialize(new Dictionary<string, object>
+        {
+          { "type", "insertResult" },
+          { "success", false },
+          { "message", "图片数据为空" }
+        }));
+        return;
+      }
+
+      try
+      {
+        var insertResult = imageInserter.InsertImage(base64Data, filename);
+
+        var result = new Dictionary<string, object>
+        {
+          { "type", "insertResult" },
+          { "success", insertResult.Success },
+          { "message", insertResult.Message }
+        };
+
+        if (insertResult.Success)
+        {
+          result["widthMm"] = insertResult.WidthMm;
+          result["heightMm"] = insertResult.HeightMm;
+        }
+
+        SendToJs(jsonSerializer.Serialize(result));
+      }
+      catch (Exception ex)
+      {
+        WriteLog("ERROR", "插入图片失败: " + ex.Message);
+        SendToJs(jsonSerializer.Serialize(new Dictionary<string, object>
+        {
+          { "type", "insertResult" },
+          { "success", false },
+          { "message", "插入失败: " + ex.Message }
+        }));
       }
     }
 
