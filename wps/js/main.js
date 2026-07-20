@@ -12,11 +12,16 @@
   var pluginState = {
     initialized: false,
     taskpaneVisible: false,
-    layersConfig: null
+    layersConfig: null,
+    ribbonUI: null,
+    wpsVersion: null
   };
 
   // 日志文件路径（相对于插件目录）
   var LOG_FILE = "wps-plugin.log";
+
+  // WPS 最低版本要求
+  var MIN_WPS_VERSION = 2019;
 
   /**
    * 写入日志到文件和控制台
@@ -45,6 +50,54 @@
   }
 
   /**
+   * 检测 WPS 版本，确保满足最低要求
+   * @returns {object} { compatible: boolean, version: string, message: string }
+   */
+  function detectWpsVersion() {
+    var result = { compatible: true, version: "unknown", message: "" };
+
+    try {
+      if (typeof wps === "undefined" || !wps.Application) {
+        result.version = "N/A";
+        result.message = "非 WPS 环境，跳过版本检测";
+        writeLog("WARN", result.message);
+        return result;
+      }
+
+      // 获取 WPS 版本号
+      var version = wps.Application.Version;
+      result.version = String(version);
+      pluginState.wpsVersion = result.version;
+
+      // 解析主版本号（WPS 版本号格式如 "11.1.0.12345" 或 "2019"）
+      var majorVersion = parseInt(result.version.split(".")[0], 10);
+
+      if (isNaN(majorVersion)) {
+        result.message = "无法解析 WPS 版本号: " + result.version;
+        writeLog("WARN", result.message);
+        return result;
+      }
+
+      // WPS 2019 对应主版本号 11+（WPS Office 2019 内部版本为 11.x）
+      // 简化判断：版本号 >= 2019 或 >= 11 均视为兼容
+      if (majorVersion >= MIN_WPS_VERSION || majorVersion >= 11) {
+        result.compatible = true;
+        result.message = "WPS 版本 " + result.version + "，满足要求";
+      } else {
+        result.compatible = false;
+        result.message = "WPS 版本 " + result.version + " 低于最低要求 " + MIN_WPS_VERSION + "，部分功能可能不可用";
+      }
+
+      writeLog("INFO", result.message);
+    } catch (e) {
+      result.message = "版本检测失败: " + e.message;
+      writeLog("WARN", result.message);
+    }
+
+    return result;
+  }
+
+  /**
    * 插件初始化
    */
   function initPlugin() {
@@ -53,6 +106,24 @@
     }
 
     writeLog("INFO", "插件初始化...");
+
+    // WPS 版本检测
+    var versionCheck = detectWpsVersion();
+    if (!versionCheck.compatible) {
+      writeLog("WARN", "WPS 版本不兼容: " + versionCheck.message);
+      try {
+        if (typeof wps !== "undefined" && wps.Alert) {
+          wps.Alert(
+            "WMS地图插件兼容性警告\n\n" + versionCheck.message + "\n建议升级到 WPS " + MIN_WPS_VERSION + " 或更高版本。",
+            "兼容性提示",
+            wps.AlertIcon.Warning
+          );
+        }
+      } catch (e) {
+        // 非 WPS 环境，忽略
+      }
+    }
+
     pluginState.initialized = true;
     writeLog("INFO", "插件初始化完成");
   }
@@ -557,6 +628,84 @@
   }
 
   /**
+   * Ribbon 加载完成回调
+   * 由 ribbon.xml 的 onLoad 属性调用
+   * @param {object} ribbonUI - Ribbon UI 对象
+   */
+  function onRibbonLoad(ribbonUI) {
+    writeLog("INFO", "Ribbon UI 加载完成");
+    pluginState.ribbonUI = ribbonUI;
+
+    // 初始化插件（如果尚未初始化）
+    initPlugin();
+  }
+
+  /**
+   * 刷新图层配置
+   * 重新读取 shared/layers.json 并更新 UI
+   * 由 ribbon.xml 中 "刷新配置" 按钮的 onAction 调用
+   */
+  function refreshLayersConfig() {
+    writeLog("INFO", "refreshLayersConfig() 被调用 - 开始刷新图层配置");
+
+    // 清除缓存，强制重新读取
+    pluginState.layersConfig = null;
+
+    showLoading();
+    updateStatus("正在刷新图层配置...");
+
+    loadLayersConfig()
+      .then(function (config) {
+        // 更新 iframe 中的配置
+        var iframe = document.getElementById("map-frame");
+        if (iframe) {
+          sendConfigToIframe(iframe, config);
+        }
+
+        var serviceCount = config.services ? config.services.length : 0;
+        var projCount = config.availableProjections ? config.availableProjections.length : 0;
+        updateStatus("配置已刷新：" + serviceCount + " 个服务，" + projCount + " 个投影");
+        writeLog("INFO", "图层配置刷新完成");
+      })
+      .catch(function (err) {
+        writeLog("ERROR", "刷新图层配置失败: " + err.message);
+        updateStatus("配置刷新失败: " + err.message);
+        try {
+          if (typeof wps !== "undefined" && wps.Alert) {
+            wps.Alert("图层配置刷新失败: " + err.message, "错误", wps.AlertIcon.Warning);
+          }
+        } catch (e) {
+          alert("图层配置刷新失败: " + err.message);
+        }
+      });
+  }
+
+  /**
+   * 显示关于对话框
+   * 由 ribbon.xml 中 "关于" 按钮的 onAction 调用
+   */
+  function showAbout() {
+    writeLog("INFO", "showAbout() 被调用");
+
+    var versionInfo = pluginState.wpsVersion || "未知";
+    var aboutText = "WMS 地图插件 v1.0.0\n\n" +
+      "功能：在 WPS PPT 中打开可交互地图，\n" +
+      "支持图层切换、投影转换和地图插入。\n\n" +
+      "WPS 版本：" + versionInfo + "\n" +
+      "最低要求：WPS " + MIN_WPS_VERSION + "+";
+
+    try {
+      if (typeof wps !== "undefined" && wps.Alert) {
+        wps.Alert(aboutText, "关于 WMS 地图插件", wps.AlertIcon.Information);
+      } else {
+        alert(aboutText);
+      }
+    } catch (e) {
+      alert(aboutText);
+    }
+  }
+
+  /**
    * 刷新 Ribbon UI 按钮状态
    */
   function invalidateRibbon() {
@@ -580,6 +729,9 @@
   window.openMapPane = openMapPane;
   window.insertMapImage = insertMapImage;
   window.closeMapPane = closeMapPane;
+  window.refreshLayersConfig = refreshLayersConfig;
+  window.showAbout = showAbout;
+  window.onRibbonLoad = onRibbonLoad;
   window.getPluginState = getPluginState;
   window.getInsertMapEnabled = getInsertMapEnabled;
 
@@ -592,4 +744,9 @@
   } else {
     initPlugin();
   }
+
+  // 页面卸载时记录关闭日志
+  window.addEventListener("beforeunload", function () {
+    writeLog("INFO", "插件即将关闭/卸载");
+  });
 })();
