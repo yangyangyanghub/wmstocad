@@ -41,28 +41,43 @@
     zoomControl: true
   });
 
-  // 4. 加载默认 WMS 图层
-  var defaultWmsUrl = "http://61.240.150.90:8088/mixserver/services/map-ugcv5-dom202605y2m18level/wms111/dom202605y2m18level?";
-
-  var defaultWmsLayer = L.tileLayer.wms(defaultWmsUrl, {
-    layers: "0",
-    format: "image/png",
-    transparent: true,
-    version: "1.1.1",
-    srs: "EPSG:4490"
-  });
-
-  defaultWmsLayer.addTo(map);
-
-  // 5. 暴露全局接口供其他模块使用
+  // 4. 暴露全局接口供其他模块使用
   window.wmsMap = map;
   window.wmsCrs = crs4490;
-  window.wmsLayer = defaultWmsLayer;
+
+  // 5. 等待图层配置加载后，通过 wms.js 加载默认图层
+  function loadDefaultLayer() {
+    if (window.wmsLayers && window.wmsLayers.getConfig() && window.wmsWms) {
+      var cfg = window.wmsLayers.getConfig();
+      if (cfg.services.length > 0 && cfg.services[0].layers.length > 0) {
+        var serviceId = cfg.services[0].id;
+        var layerName = cfg.services[0].layers[0].name;
+        window.wmsWms.switchLayer(serviceId, layerName)
+          .then(function() {
+            console.log('Default WMS layer loaded:', serviceId + '/' + layerName);
+          })
+          .catch(function(err) {
+            console.error('默认图层加载失败:', err);
+          });
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // 轮询等待配置就绪（最多 5 秒）
+  if (!loadDefaultLayer()) {
+    var waitTimer = setInterval(function() {
+      if (loadDefaultLayer()) {
+        clearInterval(waitTimer);
+      }
+    }, 100);
+    setTimeout(function() { clearInterval(waitTimer); }, 5000);
+  }
 
   // 6. 初始化日志
   console.log("Map initialized with EPSG:4490");
   console.log("Center:", map.getCenter());
   console.log("Zoom:", map.getZoom());
-  console.log("WMS layer added:", defaultWmsUrl);
 
 })();

@@ -45,46 +45,6 @@
   <script src="js/error.js"></script>
   <script src="js/adapter.js"></script>
 
-  <script>
-    // 加载 layers.json 并填充 UI 下拉框
-    fetch('layers.json')
-      .then(function(r) { return r.json(); })
-      .then(function(config) {
-        // 填充图层下拉框
-        var layerSelect = document.getElementById('layer-select');
-        config.services.forEach(function(service) {
-          service.layers.forEach(function(layer) {
-            var opt = document.createElement('option');
-            opt.value = service.id + ':' + layer.name;
-            opt.textContent = service.name + ' - ' + layer.title;
-            layerSelect.appendChild(opt);
-          });
-        });
 
-        // 填充投影下拉框
-        var projSelect = document.getElementById('projection-select');
-        config.availableProjections.forEach(function(proj) {
-          var opt = document.createElement('option');
-          opt.value = proj.epsg;
-          opt.textContent = proj.epsg + ' - ' + proj.name;
-          projSelect.appendChild(opt);
-        });
-
-        // 添加"自定义"选项
-        var customOpt = document.createElement('option');
-        customOpt.value = 'custom';
-        customOpt.textContent = '自定义...';
-        projSelect.appendChild(customOpt);
-
-        // 设置默认投影
-        projSelect.value = config.defaultProjection.epsg;
-
-        // 切换自定义投影输入框显示
-        projSelect.addEventListener('change', function() {
-          document.getElementById('custom-proj-input').style.display =
-            projSelect.value === 'custom' ? 'block' : 'none';
-        });
-      });
-  </script>
 </body>
 </html>

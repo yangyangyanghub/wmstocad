@@ -166,8 +166,53 @@
     createCrs: createProjectedCrs
   };
 
-  // 7. Bind UI events (if projection-select exists)
+  // 7. 填充投影下拉框
+  function populateProjectionSelect() {
+    var projSelect = document.getElementById('projection-select');
+    if (!projSelect) return;
+
+    projSelect.innerHTML = '';
+
+    Object.keys(projections).forEach(function(epsg) {
+      var opt = document.createElement('option');
+      opt.value = epsg;
+      opt.textContent = epsg + ' - ' + projections[epsg].name;
+      projSelect.appendChild(opt);
+    });
+
+    // 添加"自定义"选项
+    var customOpt = document.createElement('option');
+    customOpt.value = 'custom';
+    customOpt.textContent = '自定义...';
+    projSelect.appendChild(customOpt);
+
+    // 设置默认投影（优先从 layers.json 读取）
+    var defaultEpsg = 'EPSG:4490';
+    if (window.wmsLayers) {
+      var cfg = window.wmsLayers.getConfig();
+      if (cfg && cfg.defaultProjection) {
+        defaultEpsg = cfg.defaultProjection.epsg;
+      }
+    }
+    projSelect.value = defaultEpsg;
+  }
+
+  // 8. Bind UI events (if projection-select exists)
   document.addEventListener('DOMContentLoaded', function() {
+    // 等待 layers.json 加载完成后填充投影下拉框
+    var tryPopulate = setInterval(function() {
+      if (window.wmsLayers && window.wmsLayers.getConfig()) {
+        clearInterval(tryPopulate);
+        populateProjectionSelect();
+      }
+    }, 100);
+
+    // 5 秒超时，使用内置投影数据
+    setTimeout(function() {
+      clearInterval(tryPopulate);
+      populateProjectionSelect();
+    }, 5000);
+
     var projSelect = document.getElementById('projection-select');
     var customInput = document.getElementById('custom-proj4');
 
