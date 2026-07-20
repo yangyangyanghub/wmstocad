@@ -31,6 +31,45 @@ namespace Autodesk.AutoCAD.Runtime
   }
 }
 
+namespace Autodesk.AutoCAD.ApplicationServices
+{
+  /// <summary>
+  /// AutoCAD 应用程序入口桩
+  /// </summary>
+  public static class Application
+  {
+    public static DocumentManager DocumentManager { get; } = new DocumentManager();
+  }
+
+  /// <summary>
+  /// 文档管理器桩
+  /// </summary>
+  public class DocumentManager
+  {
+    public Document MdiActiveDocument { get; } = new Document();
+  }
+
+  /// <summary>
+  /// 文档桩
+  /// </summary>
+  public class Document
+  {
+    public Editor Editor { get; } = new Editor();
+  }
+
+  /// <summary>
+  /// 编辑器桩，用于在 AutoCAD 命令行输出消息
+  /// </summary>
+  public class Editor
+  {
+    public void WriteMessage(string message)
+    {
+      // 桩实现：实际 AutoCAD 中会在命令行输出
+      System.Diagnostics.Debug.WriteLine(message);
+    }
+  }
+}
+
 namespace Autodesk.AutoCAD.Windows
 {
   /// <summary>

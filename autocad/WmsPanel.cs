@@ -5,6 +5,7 @@ using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 using Autodesk.AutoCAD.Windows;
+using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
 namespace WmsMapPlugin
@@ -16,6 +17,7 @@ namespace WmsMapPlugin
   public class WmsPanel : PaletteSet
   {
     private WebView2 webView;
+    private WmsBridge bridge;
 
     /// <summary>
     /// 面板唯一标识 GUID
@@ -67,6 +69,13 @@ namespace WmsMapPlugin
         return;
       }
 
+      // 允许 file:// 协议下的脚本执行
+      webView.CoreWebView2.Settings.IsScriptEnabled = true;
+
+      // 创建通信桥并注册消息接收事件
+      bridge = new WmsBridge(webView);
+      webView.CoreWebView2.WebMessageReceived += bridge.OnWebMessageReceived;
+
       // 计算 shared/map.html 的绝对路径
       // DLL 位于 autocad/bin/ 下，shared/ 在项目根目录
       string dllDir = Path.GetDirectoryName(typeof(WmsPanel).Assembly.Location);
@@ -88,9 +97,14 @@ namespace WmsMapPlugin
     {
       if (webView != null)
       {
+        if (webView.CoreWebView2 != null && bridge != null)
+        {
+          webView.CoreWebView2.WebMessageReceived -= bridge.OnWebMessageReceived;
+        }
         webView.Dispose();
         webView = null;
       }
+      bridge = null;
       base.Dispose();
     }
   }

@@ -9,5 +9,6 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.*" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Web.Extensions" />
   </ItemGroup>
 </Project>
