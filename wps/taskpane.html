@@ -32,6 +32,25 @@
       border: none;
     }
 
+    #loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: calc(100% - 24px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.9);
+      z-index: 10;
+      font-size: 14px;
+      color: #666;
+    }
+
+    #loading-overlay.hidden {
+      display: none;
+    }
+
     #status-bar {
       height: 24px;
       line-height: 24px;
@@ -45,6 +64,7 @@
 </head>
 <body>
   <div id="taskpane-container">
+    <div id="loading-overlay">地图加载中...</div>
     <iframe id="map-frame" src="../shared/map.html"></iframe>
     <div id="status-bar">就绪</div>
   </div>
