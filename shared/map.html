@@ -1,9 +1,90 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WMS 地图</title>
+  <link rel="stylesheet" href="lib/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <div id="app">
+    <div id="map"></div>
+    <div id="control-panel">
+      <div class="panel-section">
+        <h3>图层</h3>
+        <select id="layer-select"></select>
+        <button id="refresh-layers">刷新配置</button>
+      </div>
+      <div class="panel-section">
+        <h3>投影</h3>
+        <select id="projection-select"></select>
+        <div id="custom-proj-input" style="display:none;">
+          <input type="text" id="custom-proj4" placeholder="输入 proj4 字符串">
+        </div>
+      </div>
+      <div class="panel-section">
+        <h3>出图</h3>
+        <button id="btn-getmap">GetMap 出图（高质量）</button>
+        <button id="btn-screenshot">快速截图</button>
+      </div>
+      <div id="status-bar">就绪</div>
+    </div>
+  </div>
+
+  <!-- Scripts (order matters) -->
+  <script src="lib/proj4/proj4.js"></script>
+  <script src="lib/leaflet/leaflet.js"></script>
+  <script src="lib/proj4leaflet/proj4leaflet.js"></script>
+  <script src="lib/html2canvas/html2canvas.min.js"></script>
+  <script src="js/layers.js"></script>
+  <script src="js/projection.js"></script>
+  <script src="js/wms.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/output.js"></script>
+  <script src="js/error.js"></script>
+  <script src="js/adapter.js"></script>
+
+  <script>
+    // 加载 layers.json 并填充 UI 下拉框
+    fetch('layers.json')
+      .then(function(r) { return r.json(); })
+      .then(function(config) {
+        // 填充图层下拉框
+        var layerSelect = document.getElementById('layer-select');
+        config.services.forEach(function(service) {
+          service.layers.forEach(function(layer) {
+            var opt = document.createElement('option');
+            opt.value = service.id + ':' + layer.name;
+            opt.textContent = service.name + ' - ' + layer.title;
+            layerSelect.appendChild(opt);
+          });
+        });
+
+        // 填充投影下拉框
+        var projSelect = document.getElementById('projection-select');
+        config.availableProjections.forEach(function(proj) {
+          var opt = document.createElement('option');
+          opt.value = proj.epsg;
+          opt.textContent = proj.epsg + ' - ' + proj.name;
+          projSelect.appendChild(opt);
+        });
+
+        // 添加"自定义"选项
+        var customOpt = document.createElement('option');
+        customOpt.value = 'custom';
+        customOpt.textContent = '自定义...';
+        projSelect.appendChild(customOpt);
+
+        // 设置默认投影
+        projSelect.value = config.defaultProjection.epsg;
+
+        // 切换自定义投影输入框显示
+        projSelect.addEventListener('change', function() {
+          document.getElementById('custom-proj-input').style.display =
+            projSelect.value === 'custom' ? 'block' : 'none';
+        });
+      });
+  </script>
 </body>
 </html>
