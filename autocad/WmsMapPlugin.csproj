@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
+    <OutputType>Library</OutputType>
     <RootNamespace>WmsMapPlugin</RootNamespace>
     <AssemblyName>WmsMapPlugin</AssemblyName>
   </PropertyGroup>
