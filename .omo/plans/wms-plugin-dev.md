@@ -201,7 +201,7 @@ WPS 完成 → feature/wps-plugin merge → master
 > 目标：建立项目骨架，验证三项技术风险。POC 全部通过后才进入正式开发。
 > 并行度：项目脚手架 + 3 项 POC 可穿插进行。
 
-- [ ] 1. 项目脚手架 + layers.json 配置
+- [x] 1. 项目脚手架 + layers.json 配置
 
   **What to do**:
   - 在 master 分支创建完整目录结构（shared/autocad/wps/docs）
@@ -244,7 +244,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 2. POC: CORS 连通性验证
+- [x] 2. POC: CORS 连通性验证
 
   **What to do**:
   - 用 curl 或浏览器请求 WMS GetCapabilities，检查响应头是否包含 `Access-Control-Allow-Origin`
@@ -281,7 +281,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 3. POC: WebView2 + Leaflet 集成验证
+- [x] 3. POC: WebView2 + Leaflet 集成验证
 
   **What to do**:
   - 创建最小 C# 项目（WinForms 或 WPF），嵌入 WebView2
@@ -322,7 +322,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 4. POC: WPS JSAPI + Leaflet 集成验证
+- [x] 4. POC: WPS JSAPI + Leaflet 集成验证
 
   **What to do**:
   - 创建最小 WPS JSAPI 插件项目（manifest.xml + taskpane.html）
@@ -368,7 +368,7 @@ WPS 完成 → feature/wps-plugin merge → master
 > 目标：完成 shared/ 全部功能，可在浏览器中独立运行。
 > 关键路径：此阶段是后续两个插件的前置依赖。
 
-- [ ] 5. 共享前端：基础 HTML 结构和 UI 布局
+- [x] 5. 共享前端：基础 HTML 结构和 UI 布局
 
   **What to do**:
   - 创建 map.html，引入本地 Leaflet/proj4/proj4leaflet/html2canvas
@@ -410,7 +410,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 6. 共享前端：Leaflet 地图初始化 + EPSG:4490
+- [x] 6. 共享前端：Leaflet 地图初始化 + EPSG:4490
 
   **What to do**:
   - 创建 js/map.js：初始化 Leaflet 地图实例
@@ -453,7 +453,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 7. 共享前端：投影切换系统
+- [x] 7. 共享前端：投影切换系统
 
   **What to do**:
   - 创建 js/projection.js：投影管理模块
@@ -497,7 +497,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 8. 共享前端：WMS 图层管理
+- [x] 8. 共享前端：WMS 图层管理
 
   **What to do**:
   - 创建 js/layers.js：图层配置管理模块
@@ -547,7 +547,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 9. 共享前端：截图与 GetMap 出图
+- [x] 9. 共享前端：截图与 GetMap 出图
 
   **What to do**:
   - 创建 js/output.js：出图模块
@@ -597,7 +597,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 10. 共享前端：错误处理与日志
+- [x] 10. 共享前端：错误处理与日志
 
   **What to do**:
   - 创建 js/error.js：错误处理模块
@@ -652,7 +652,7 @@ WPS 完成 → feature/wps-plugin merge → master
 > 前置：Wave 1 完成（共享前端可用），POC 验证通过。
 > Worktree：在 wmstocad-autocad (feature/autocad-plugin) 中开发。
 
-- [ ] 11. AutoCAD 插件：.NET 项目搭建
+- [x] 11. AutoCAD 插件：.NET 项目搭建
 
   **What to do**:
   - 在 feature/autocad-plugin 分支，完善 autocad/ 项目结构
@@ -695,7 +695,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 12. AutoCAD 插件：PaletteSet + WebView2 面板
+- [x] 12. AutoCAD 插件：PaletteSet + WebView2 面板
 
   **What to do**:
   - 实现 WmsPanel 类（继承 PaletteSet）
@@ -738,7 +738,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 13. AutoCAD 插件：C# ↔ JavaScript 通信
+- [x] 13. AutoCAD 插件：C# ↔ JavaScript 通信
 
   **What to do**:
   - 实现 WmsBridge 类（C#↔JS 通信桥）
@@ -782,7 +782,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 14. AutoCAD 插件：图片插入 CAD
+- [x] 14. AutoCAD 插件：图片插入 CAD
 
   **What to do**:
   - 实现图片插入逻辑：
@@ -824,7 +824,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 15. AutoCAD 插件：配置管理与功能完善
+- [x] 15. AutoCAD 插件：配置管理与功能完善
 
   **What to do**:
   - 实现 layers.json 热重载：
@@ -877,7 +877,7 @@ WPS 完成 → feature/wps-plugin merge → master
 > 前置：Wave 1 完成。可与 Wave 2 交替进行（1 人开发时，先完成 AutoCAD 再做 WPS，或交替）。
 > Worktree：在 wmstocad-wps (feature/wps-plugin) 中开发。
 
-- [ ] 16. WPS 插件：JSAPI 项目搭建
+- [x] 16. WPS 插件：JSAPI 项目搭建
 
   **What to do**:
   - 在 feature/wps-plugin 分支，完善 wps/ 项目结构
@@ -918,7 +918,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 17. WPS 插件：任务窗格 + 地图集成
+- [x] 17. WPS 插件：任务窗格 + 地图集成
 
   **What to do**:
   - 在 taskpane.html 中嵌入 shared/map.html（iframe 或直接加载）
@@ -957,7 +957,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 18. WPS 插件：图片插入 PPT
+- [x] 18. WPS 插件：图片插入 PPT
 
   **What to do**:
   - 实现 ribbon "插入地图"按钮逻辑（insertMapImage）
@@ -998,7 +998,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 19. WPS 插件：Ribbon 完善与配置管理
+- [x] 19. WPS 插件：Ribbon 完善与配置管理
 
   **What to do**:
   - 完善 ribbon 按钮图标和提示文本

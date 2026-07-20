@@ -8,7 +8,7 @@
           <button id="openMap"
                   label="打开地图"
                   onAction="openMapPane"
-                  image="icons/open-map.png"
+                  imageMso="MapPin"
                   size="large"
                   screentip="打开WMS地图任务窗格"
                   supertip="在右侧打开可交互的WMS地图面板，支持图层切换、投影转换和地图浏览。"/>
@@ -16,7 +16,7 @@
                   label="插入地图"
                   onAction="insertMapImage"
                   getEnabled="getInsertMapEnabled"
-                  image="icons/insert-map.png"
+                  imageMso="PictureInsert"
                   size="large"
                   screentip="将当前地图视图插入幻灯片"
                   supertip="截取当前地图视图并插入到当前幻灯片中，图片自动居中并保持宽高比。需先打开地图面板。"/>
@@ -25,7 +25,7 @@
           <button id="refreshConfig"
                   label="刷新配置"
                   onAction="refreshLayersConfig"
-                  image="icons/refresh.png"
+                  imageMso="Refresh"
                   size="normal"
                   screentip="重新加载图层配置"
                   supertip="重新读取 shared/layers.json 配置文件，更新图层列表和投影信息。修改配置后点击此按钮使更改生效。"/>
