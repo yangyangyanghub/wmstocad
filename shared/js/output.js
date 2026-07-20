@@ -1,0 +1,1 @@
+// GetMap and screenshot output

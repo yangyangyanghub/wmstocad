@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui">
+  <ribbon>
+    <tabs>
+      <tab id="wmsMapTab" label="WMS地图">
+        <group id="mapGroup" label="地图">
+          <button id="openMap" label="打开地图"
+                  onAction="openMapPane"
+                  imageMso="MapPin"/>
+          <button id="insertMap" label="插入地图"
+                  onAction="insertMapImage"
+                  imageMso="PictureInsert"/>
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>

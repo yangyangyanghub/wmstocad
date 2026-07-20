@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "active_work_id": "wms-plugin-dev-b83d9494",
+  "works": {
+    "wms-plugin-dev-b83d9494": {
+      "work_id": "wms-plugin-dev-b83d9494",
+      "active_plan": "E:\\code\\wmstocad\\.omo\\plans\\wms-plugin-dev.md",
+      "plan_name": "wms-plugin-dev",
+      "status": "active",
+      "started_at": "2026-07-20T03:49:46.509Z",
+      "updated_at": "2026-07-20T03:49:46.509Z",
+      "session_ids": [
+        "opencode:ses_0827527a9ffe4PsOWd65lIQ7TL"
+      ],
+      "session_origins": {
+        "opencode:ses_0827527a9ffe4PsOWd65lIQ7TL": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {}
+    }
+  },
+  "active_plan": "E:\\code\\wmstocad\\.omo\\plans\\wms-plugin-dev.md",
+  "started_at": "2026-07-20T03:49:46.509Z",
+  "status": "active",
+  "updated_at": "2026-07-20T03:49:46.509Z",
+  "session_ids": [
+    "opencode:ses_0827527a9ffe4PsOWd65lIQ7TL"
+  ],
+  "session_origins": {
+    "opencode:ses_0827527a9ffe4PsOWd65lIQ7TL": "direct"
+  },
+  "plan_name": "wms-plugin-dev",
+  "task_sessions": {},
+  "agent": "atlas"
+}

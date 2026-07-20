@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <id>WmsMapPlugin</id>
+  <version>1.0.0</version>
+  <name>WMS 地图插件</name>
+  <description>在 WPS PPT 中打开可交互地图</description>
+  <platform>wps</platform>
+</manifest>
