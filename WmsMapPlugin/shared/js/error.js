@@ -155,6 +155,49 @@
     }
   }
 
+  // ========== QA 统计（GetMap 出图运行时统计，内存环形，不持久化） ==========
+
+  var QA_MAX_ERRORS = 10; // 最近错误保留条数
+  var qaStats = {
+    total: 0,
+    success: 0,
+    fail: 0,
+    lastErrors: []
+  };
+
+  // 记录一次 GetMap 请求结果（由 logWmsRequest 调用）
+  function recordQa(success, info) {
+    qaStats.total++;
+    if (success) {
+      qaStats.success++;
+    } else {
+      qaStats.fail++;
+      qaStats.lastErrors.push({
+        timestamp: getTimestamp(),
+        url: info.url,
+        layerName: info.layerName,
+        bbox: info.bbox,
+        status: info.status,
+        duration: info.duration,
+        error: info.error
+      });
+      // 环形：只保留最近 QA_MAX_ERRORS 条
+      if (qaStats.lastErrors.length > QA_MAX_ERRORS) {
+        qaStats.lastErrors = qaStats.lastErrors.slice(-QA_MAX_ERRORS);
+      }
+    }
+  }
+
+  // 查看 QA 统计摘要，console 中直接调用 wmsQaSummary()
+  function getQaSummary() {
+    return {
+      total: qaStats.total,
+      success: qaStats.success,
+      fail: qaStats.fail,
+      lastErrors: qaStats.lastErrors.slice()
+    };
+  }
+
   // ========== Edge Case Detection ==========
 
   // 检测 WMS 返回空图片（尺寸极小）
@@ -179,24 +222,51 @@
     return true;
   }
 
-  // 包装 fetch 以记录 WMS 请求
-  function logWmsRequest(url, startTime, response, error) {
+  // 检测 WMS 返回的 Blob 是否为空图片
+  // 通过 Image 解码后复用 checkEmptyImage 的尺寸判断；解码失败也视为无效图
+  function checkEmptyBlob(blob) {
+    return new Promise(function(resolve) {
+      if (!blob || typeof URL === 'undefined' || !URL.createObjectURL) {
+        resolve(false);
+        return;
+      }
+      var objectUrl = URL.createObjectURL(blob);
+      var img = new Image();
+      function done(isEmpty) {
+        URL.revokeObjectURL(objectUrl);
+        resolve(isEmpty);
+      }
+      img.onload = function() {
+        done(checkEmptyImage(img));
+      };
+      img.onerror = function() {
+        done(true);
+      };
+      img.src = objectUrl;
+    });
+  }
+
+  // 包装 fetch 以记录 WMS 请求（同时累计 QA 统计）
+  // extra 可选：{ layerName, bbox }，由调用方提供用于统计与排查
+  function logWmsRequest(url, startTime, response, error, extra) {
     var duration = Date.now() - startTime;
+    var info = {
+      url: url,
+      status: response ? response.status : 0,
+      duration: duration
+    };
+    if (extra) {
+      if (extra.layerName) info.layerName = extra.layerName;
+      if (extra.bbox) info.bbox = extra.bbox;
+    }
     if (error) {
-      wmsLogger.error('wms', 'WMS 请求失败', {
-        url: url,
-        status: 0,
-        duration: duration,
-        error: error.message || String(error)
-      });
+      info.error = error.message || String(error);
+      wmsLogger.error('wms', 'WMS 请求失败', info);
+      recordQa(false, info);
     } else {
-      var status = response ? response.status : 0;
       var level = (response && response.ok) ? 'info' : 'warn';
-      wmsLogger[level]('wms', 'WMS 请求完成', {
-        url: url,
-        status: status,
-        duration: duration
-      });
+      wmsLogger[level]('wms', 'WMS 请求完成', info);
+      recordQa(true, info);
     }
   }
 
@@ -225,8 +295,10 @@
   window.showWarning = showWarning;
   window.showInfo = showInfo;
   window.wmsLogger = wmsLogger;
+  window.wmsQaSummary = getQaSummary;
   window.wmsErrorUtils = {
     checkEmptyImage: checkEmptyImage,
+    checkEmptyBlob: checkEmptyBlob,
     checkContentType: checkContentType,
     logWmsRequest: logWmsRequest,
     sendToHost: sendToHost,

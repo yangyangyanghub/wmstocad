@@ -20,6 +20,9 @@
   // 日志文件路径（相对于插件目录）
   var LOG_FILE = "wps-plugin.log";
 
+  // 日志文件大小上限：约 2MB
+  var MAX_LOG_SIZE = 2 * 1024 * 1024;
+
   // WPS 最低版本要求
   var MIN_WPS_VERSION = 2019;
 
@@ -40,6 +43,17 @@
       if (typeof wps !== "undefined" && wps.FileSystem) {
         var pluginPath = wps.FileSystem.GetCurrentPluginPath();
         var logPath = pluginPath + "/" + LOG_FILE;
+        // 限制日志文件大小：wps.FileSystem 没有获取文件大小/截断文件的 API，
+        // 只能借助 Scripting.FileSystemObject 检查大小，超过约 2MB 时删除旧文件后重新写
+        // （即"清空重写"，无法像 C# 端那样保留一份 .old 轮转副本）
+        try {
+          var fso = new ActiveXObject("Scripting.FileSystemObject");
+          if (fso.FileExists(logPath) && fso.GetFile(logPath).Size > MAX_LOG_SIZE) {
+            fso.DeleteFile(logPath, true);
+          }
+        } catch (sizeErr) {
+          // 大小检查失败则直接追加，不影响主流程
+        }
         // 追加写入
         wps.FileSystem.AppendToFile(logPath, logLine);
       }

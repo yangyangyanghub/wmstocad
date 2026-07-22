@@ -1,256 +1,265 @@
-// WMS Map Plugin - Projection Management
-// Task 7: Projection switching system with proj4js
-
+// projection.js - 投影管理系统（集成 epsg.io API，支持任意 EPSG 投影）
 (function() {
   'use strict';
 
-  // 1. Register all predefined projections
-  var projections = {
+  // 预设投影（快速选择用）
+  var presetProjections = {
     "EPSG:4490": {
       name: "CGCS2000 (经纬度)",
       proj4: "+proj=longlat +ellps=GRS80 +no_defs +type=crs",
       unit: "度",
-      resolutions: [
-        0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001,
-        0.0005, 0.0002, 0.0001, 0.00005, 0.00002, 0.00001
-      ]
+      resolutions: [0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001, 0.0005, 0.0002, 0.0001, 0.00005, 0.00002, 0.00001]
     },
     "EPSG:4534": {
       name: "CGCS2000 / 3度带 114°E",
       proj4: "+proj=tmerc +lat_0=0 +lon_0=114 +k=1 +x_0=38500000 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs",
       unit: "米",
-      resolutions: [
-        1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1
-      ]
+      resolutions: [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
     },
     "EPSG:4535": {
       name: "CGCS2000 / 3度带 117°E",
       proj4: "+proj=tmerc +lat_0=0 +lon_0=117 +k=1 +x_0=39500000 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs",
       unit: "米",
-      resolutions: [
-        1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1
-      ]
+      resolutions: [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
     },
     "EPSG:4536": {
       name: "CGCS2000 / 3度带 120°E",
       proj4: "+proj=tmerc +lat_0=0 +lon_0=120 +k=1 +x_0=40500000 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs",
       unit: "米",
-      resolutions: [
-        1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1
-      ]
+      resolutions: [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
     },
     "EPSG:3857": {
       name: "Web 墨卡托",
       proj4: "+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +no_defs +type=crs",
       unit: "米",
-      resolutions: [
-        156543.03390625, 78271.516953125, 39135.7584765625, 19567.87923828125,
-        9783.939619140625, 4891.9698095703125, 2445.9849047851562,
-        1222.9924523925781, 611.4962261962891, 305.74811309814453,
-        152.87405654907226, 76.43702827453613, 38.218514137268066,
-        19.109257068634033, 9.554628534317017, 4.777314267158508,
-        2.388657133579254, 1.194328566789627, 0.5971642833948135
-      ]
+      resolutions: [156543.03390625, 78271.516953125, 39135.7584765625, 19567.87923828125, 9783.939619140625, 4891.9698095703125, 2445.9849047851562, 1222.9924523925781, 611.4962261962891, 305.74811309814453, 152.87405654907226, 76.43702827453613, 38.218514137268066, 19.109257068634033, 9.554628534317017, 4.777314267158508, 2.388657133579254, 1.194328566789627, 0.5971642833948135]
     }
   };
 
-  // Register all projections with proj4
-  Object.keys(projections).forEach(function(epsg) {
-    proj4.defs(epsg, projections[epsg].proj4);
+  // 注册所有预设投影
+  Object.keys(presetProjections).forEach(function(epsg) {
+    proj4.defs(epsg, presetProjections[epsg].proj4);
   });
 
-  // 2. Create projected CRS function
+  var currentEpsg = 'EPSG:4490';
+
+  // 创建投影 CRS
   function createProjectedCrs(epsgCode, proj4def, resolutions) {
-    // Register projection if not already registered
     if (!proj4.defs(epsgCode)) {
       proj4.defs(epsgCode, proj4def);
     }
-
     return new L.Proj.CRS(epsgCode, proj4def, {
       origin: [0, 0],
-      resolutions: resolutions
+      resolutions: resolutions || [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
     });
   }
 
-  // 3. Switch projection
-  function switchProjection(epsgCode, customProj4) {
+  // 从 epsg.io 查询投影定义
+  function queryFromEpsgIo(epsgCode) {
+    var code = epsgCode.replace('EPSG:', '');
+    var url = 'https://epsg.io/' + code + '.proj4';
+
+    return fetch(url)
+      .then(function(resp) {
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.text();
+      })
+      .then(function(proj4def) {
+        proj4def = proj4def.trim();
+        if (!proj4def || proj4def.indexOf('+proj=') !== 0) {
+          throw new Error('epsg.io 返回无效的 proj4 字符串');
+        }
+        return proj4def;
+      });
+  }
+
+  // 切换投影
+  function switchProjection(epsgCode, proj4def, resolutions) {
     var map = window.wmsMap;
     if (!map) {
-      console.error("Map not initialized");
+      console.error('[Projection] 地图未初始化');
       return false;
     }
 
-    var projConfig;
-
-    if (epsgCode === "custom" && customProj4) {
-      // Custom projection
-      projConfig = {
-        name: "自定义投影",
-        proj4: customProj4,
-        unit: "米",
-        resolutions: [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
-      };
-
-      // Try to register custom projection
-      try {
-        proj4.defs("EPSG:CUSTOM", customProj4);
-        epsgCode = "EPSG:CUSTOM";
-      } catch (err) {
-        console.error("Invalid custom projection:", err);
-        alert("投影参数无效，已切换到默认坐标系");
-        epsgCode = "EPSG:4490";
-        projConfig = projections[epsgCode];
-      }
-    } else {
-      projConfig = projections[epsgCode];
-      if (!projConfig) {
-        console.error("Projection not found:", epsgCode);
-        alert("投影参数无效，已切换到默认坐标系");
-        epsgCode = "EPSG:4490";
-        projConfig = projections[epsgCode];
+    // 如果没有提供 proj4def，尝试从预设获取
+    if (!proj4def) {
+      var preset = presetProjections[epsgCode];
+      if (preset) {
+        proj4def = preset.proj4;
+        resolutions = preset.resolutions;
+      } else {
+        console.error('[Projection] 未找到投影定义:', epsgCode);
+        return false;
       }
     }
 
-    // Create new CRS
+    // 创建新 CRS
     var newCrs;
     try {
-      newCrs = createProjectedCrs(epsgCode, projConfig.proj4, projConfig.resolutions);
+      newCrs = createProjectedCrs(epsgCode, proj4def, resolutions);
     } catch (err) {
-      console.error("Failed to create CRS:", err);
-      alert("投影参数无效，已切换到默认坐标系");
-      // Fall back to EPSG:4490
-      epsgCode = "EPSG:4490";
-      projConfig = projections[epsgCode];
-      newCrs = createProjectedCrs(epsgCode, projConfig.proj4, projConfig.resolutions);
+      console.error('[Projection] 创建 CRS 失败:', err);
+      return false;
     }
 
-    // Get current center in lat/lng
+    // 保存当前地理中心
     var currentCenter = map.getCenter();
 
-    // Update map CRS
+    // 替换 CRS
     map.options.crs = newCrs;
+    window.wmsCrs = newCrs;
+    currentEpsg = epsgCode;
 
-    // Reset view to same geographic location
+    // 重新定位
     map.setView(currentCenter, map.getZoom());
 
-    // Update global reference
-    window.wmsCrs = newCrs;
+    // 更新 UI 显示
+    updateProjInfo(epsgCode, proj4def);
 
-    console.log("Projection switched to:", epsgCode, projConfig.name);
-    console.log("Unit:", projConfig.unit);
+    // 刷新所有 WMS 图层（使用新 CRS）
+    if (window.wmsWms && window.wmsWms.refreshAllLayers) {
+      window.wmsWms.refreshAllLayers();
+    }
 
+    // 缩放至图层可见范围
+    setTimeout(function() {
+      if (window.wmsLayers && window.wmsLayers.zoomToVisibleLayers) {
+        window.wmsLayers.zoomToVisibleLayers();
+      }
+    }, 500);
+
+    console.log('[Projection] 已切换到:', epsgCode);
     return true;
   }
 
-  // 4. Get projection info
-  function getProjectionInfo(epsgCode) {
-    return projections[epsgCode] || null;
+  // 更新投影信息显示
+  function updateProjInfo(epsg, proj4def) {
+    var infoEl = document.getElementById('current-proj-info');
+    if (!infoEl) return;
+
+    var preset = presetProjections[epsg];
+    var name = preset ? preset.name : epsg;
+    // 从预设获取单位，或从 proj4 字符串解析
+    var unit;
+    if (preset) {
+      unit = preset.unit;
+    } else if (proj4def) {
+      // proj4 字符串中 +units=m 表示米，+units=ft 表示英尺，没有 +units 通常是经纬度（度）
+      if (proj4def.indexOf('+units=m') >= 0 || proj4def.indexOf('+units=m ') >= 0) {
+        unit = '米';
+      } else if (proj4def.indexOf('+units=ft') >= 0) {
+        unit = '英尺';
+      } else if (proj4def.indexOf('+proj=longlat') >= 0 || proj4def.indexOf('+proj=latlong') >= 0) {
+        unit = '度';
+      } else {
+        unit = '米'; // 投影坐标系默认米
+      }
+    } else {
+      unit = '未知';
+    }
+
+    infoEl.textContent = '当前: ' + epsg + ' (' + name + ', 单位: ' + unit + ')';
+    infoEl.title = proj4def || '';
   }
 
-  // 5. List all available projections
-  function listProjections() {
-    return Object.keys(projections).map(function(epsg) {
-      return {
-        epsg: epsg,
-        name: projections[epsg].name,
-        unit: projections[epsg].unit
-      };
+  // 从输入框查询并应用投影
+  function queryAndApplyProjection() {
+    var input = document.getElementById('epsg-input');
+    if (!input) return;
+
+    var code = input.value.trim();
+    if (!code) {
+      setStatus('请输入 EPSG 编号', true);
+      return;
+    }
+
+    // 规范化 EPSG 编号
+    var epsgCode = code.indexOf('EPSG:') === 0 ? code : 'EPSG:' + code;
+
+    // 如果是预设投影，直接切换
+    if (presetProjections[epsgCode]) {
+      switchProjection(epsgCode);
+      setStatus('已切换到预设投影: ' + epsgCode);
+      return;
+    }
+
+    // 从 epsg.io 查询
+    setStatus('正在从 epsg.io 查询 ' + epsgCode + '...');
+    queryFromEpsgIo(epsgCode)
+      .then(function(proj4def) {
+        // 注册投影
+        proj4.defs(epsgCode, proj4def);
+        // 切换（使用默认 resolutions）
+        if (switchProjection(epsgCode, proj4def)) {
+          setStatus('已应用投影: ' + epsgCode);
+        } else {
+          setStatus('投影切换失败', true);
+        }
+      })
+      .catch(function(err) {
+        setStatus('查询失败: ' + err.message, true);
+      });
+  }
+
+  function setStatus(msg, isError) {
+    var bar = document.getElementById('status-bar');
+    if (bar) {
+      bar.textContent = msg;
+      bar.style.color = isError ? '#dc3545' : '#666';
+    }
+  }
+
+  // 获取当前投影信息
+  function getCurrentProjection() {
+    return currentEpsg;
+  }
+
+  // 获取预设投影列表
+  function listPresetProjections() {
+    return Object.keys(presetProjections).map(function(epsg) {
+      return { epsg: epsg, name: presetProjections[epsg].name, unit: presetProjections[epsg].unit };
     });
   }
 
-  // 6. Expose global API
+  // 暴露全局 API
   window.wmsProjection = {
     switch: switchProjection,
-    get: getProjectionInfo,
-    list: listProjections,
+    queryFromEpsgIo: queryFromEpsgIo,
+    queryAndApply: queryAndApplyProjection,
+    getCurrent: getCurrentProjection,
+    listPresets: listPresetProjections,
     createCrs: createProjectedCrs
   };
 
-  // 7. 填充投影下拉框
-  function populateProjectionSelect() {
-    var projSelect = document.getElementById('projection-select');
-    if (!projSelect) return;
+  // 绑定 UI 事件
+  function bindEvents() {
+    var queryBtn = document.getElementById('btn-query-epsg');
+    var applyBtn = document.getElementById('btn-apply-proj');
+    var epsgInput = document.getElementById('epsg-input');
 
-    projSelect.innerHTML = '';
-
-    Object.keys(projections).forEach(function(epsg) {
-      var opt = document.createElement('option');
-      opt.value = epsg;
-      opt.textContent = epsg + ' - ' + projections[epsg].name;
-      projSelect.appendChild(opt);
-    });
-
-    // 添加"自定义"选项
-    var customOpt = document.createElement('option');
-    customOpt.value = 'custom';
-    customOpt.textContent = '自定义...';
-    projSelect.appendChild(customOpt);
-
-    // 设置默认投影（优先从 layers.json 读取）
-    var defaultEpsg = 'EPSG:4490';
-    if (window.wmsLayers) {
-      var cfg = window.wmsLayers.getConfig();
-      if (cfg && cfg.defaultProjection) {
-        defaultEpsg = cfg.defaultProjection.epsg;
-      }
+    if (queryBtn) {
+      queryBtn.addEventListener('click', queryAndApplyProjection);
     }
-    projSelect.value = defaultEpsg;
+    if (applyBtn) {
+      applyBtn.addEventListener('click', queryAndApplyProjection);
+    }
+    if (epsgInput) {
+      epsgInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') queryAndApplyProjection();
+      });
+    }
   }
 
-  // 8. Bind UI events (if projection-select exists)
-  document.addEventListener('DOMContentLoaded', function() {
-    // 等待 layers.json 加载完成后填充投影下拉框
-    var tryPopulate = setInterval(function() {
-      if (window.wmsLayers && window.wmsLayers.getConfig()) {
-        clearInterval(tryPopulate);
-        populateProjectionSelect();
-      }
-    }, 100);
+  // 初始化
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      bindEvents();
+      updateProjInfo(currentEpsg, presetProjections[currentEpsg].proj4);
+    });
+  } else {
+    bindEvents();
+    updateProjInfo(currentEpsg, presetProjections[currentEpsg].proj4);
+  }
 
-    // 5 秒超时，使用内置投影数据
-    setTimeout(function() {
-      clearInterval(tryPopulate);
-      populateProjectionSelect();
-    }, 5000);
-
-    var projSelect = document.getElementById('projection-select');
-    var customInput = document.getElementById('custom-proj4');
-
-    if (projSelect) {
-      projSelect.addEventListener('change', function() {
-        var selectedEpsg = projSelect.value;
-
-        if (selectedEpsg === 'custom') {
-          // Show custom input
-          if (customInput) {
-            customInput.parentElement.style.display = 'block';
-          }
-        } else {
-          // Hide custom input
-          if (customInput) {
-            customInput.parentElement.style.display = 'none';
-          }
-
-          // Switch projection
-          switchProjection(selectedEpsg);
-        }
-      });
-
-      // Apply custom projection on Enter key
-      if (customInput) {
-        customInput.addEventListener('keypress', function(e) {
-          if (e.key === 'Enter') {
-            var customProj4 = customInput.value.trim();
-            if (customProj4) {
-              switchProjection('custom', customProj4);
-            }
-          }
-        });
-      }
-    }
-  });
-
-  console.log("Projection module initialized");
-  console.log("Available projections:", Object.keys(projections).join(', '));
-
+  console.log('[Projection] 模块初始化完成，预设投影:', Object.keys(presetProjections).join(', '));
 })();

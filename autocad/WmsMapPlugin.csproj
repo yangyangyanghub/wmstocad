@@ -10,5 +10,35 @@
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Net.Http" />
   </ItemGroup>
+
+  <!-- AutoCAD 2023 API：本机引用，不复制到输出目录（目标机 CAD 自带） -->
+  <ItemGroup>
+    <Reference Include="acmgd">
+      <HintPath>C:\Program Files\Autodesk\AutoCAD 2023\acmgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="acdbmgd">
+      <HintPath>C:\Program Files\Autodesk\AutoCAD 2023\acdbmgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="accoremgd">
+      <HintPath>C:\Program Files\Autodesk\AutoCAD 2023\accoremgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- 编译后自动把依赖 DLL 复制到 bundle\Contents\，后续直接 sync-delivery + install 即可 -->
+  <Target Name="CopyToBundle" AfterTargets="Build">
+    <ItemGroup>
+      <BundleFiles Include="$(TargetDir)WmsMapPlugin.dll" />
+      <BundleFiles Include="$(TargetDir)Microsoft.Web.WebView2.Core.dll" />
+      <BundleFiles Include="$(TargetDir)Microsoft.Web.WebView2.WinForms.dll" />
+      <!-- WebView2Loader.dll 是原生 C++ DLL，.NET Framework 4.8 不会自动从 runtimes\ 子目录加载，
+           需要扁平化到 Contents\ 根目录。CAD 2023 是 x64，只需要 win-x64 版本 -->
+      <BundleFiles Include="$(TargetDir)runtimes\win-x64\native\WebView2Loader.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BundleFiles)" DestinationFolder="$(MSBuildThisFileDirectory)WmsMapPlugin.bundle\Contents\" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

@@ -6,9 +6,9 @@
       "work_id": "wms-plugin-dev-b83d9494",
       "active_plan": "E:\\code\\wmstocad\\.omo\\plans\\wms-plugin-dev.md",
       "plan_name": "wms-plugin-dev",
-      "status": "active",
+      "status": "completed",
       "started_at": "2026-07-20T03:49:46.509Z",
-      "updated_at": "2026-07-20T11:32:23.888Z",
+      "updated_at": "2026-07-20T12:14:13.223Z",
       "session_ids": [
         "opencode:ses_0827527a9ffe4PsOWd65lIQ7TL"
       ],
@@ -224,14 +224,55 @@
           "status": "completed",
           "ended_at": "2026-07-20T11:32:23.888Z",
           "elapsed_ms": 15725
+        },
+        "todo:20": {
+          "task_key": "todo:20",
+          "task_label": "20",
+          "task_title": "集成测试",
+          "session_id": "opencode:ses_080b2c129ffe6hhdcZMv2GEGmx",
+          "agent": "Sisyphus-Junior",
+          "category": "deep",
+          "updated_at": "2026-07-20T11:37:47.313Z",
+          "started_at": "2026-07-20T11:37:29.131Z",
+          "status": "completed",
+          "ended_at": "2026-07-20T11:37:47.313Z",
+          "elapsed_ms": 18182
+        },
+        "todo:21": {
+          "task_key": "todo:21",
+          "task_label": "21",
+          "task_title": "文档编写",
+          "session_id": "opencode:ses_080ade2f8ffeVAzfGMU4kJZRF4",
+          "agent": "Sisyphus-Junior",
+          "category": "writing",
+          "updated_at": "2026-07-20T11:43:19.028Z",
+          "started_at": "2026-07-20T11:43:03.022Z",
+          "status": "completed",
+          "ended_at": "2026-07-20T11:43:19.028Z",
+          "elapsed_ms": 16006
+        },
+        "todo:22": {
+          "task_key": "todo:22",
+          "task_label": "22",
+          "task_title": "发布打包",
+          "session_id": "opencode:ses_080a85655ffe5HEbidiqKtQ8jb",
+          "agent": "Sisyphus-Junior",
+          "category": "quick",
+          "updated_at": "2026-07-20T11:47:48.808Z",
+          "started_at": "2026-07-20T11:47:33.337Z",
+          "status": "completed",
+          "ended_at": "2026-07-20T11:47:48.808Z",
+          "elapsed_ms": 15471
         }
-      }
+      },
+      "ended_at": "2026-07-20T12:14:13.223Z",
+      "elapsed_ms": 30266714
     }
   },
   "active_plan": "E:\\code\\wmstocad\\.omo\\plans\\wms-plugin-dev.md",
   "started_at": "2026-07-20T03:49:46.509Z",
-  "status": "active",
-  "updated_at": "2026-07-20T11:32:23.888Z",
+  "status": "completed",
+  "updated_at": "2026-07-20T12:14:13.223Z",
   "session_ids": [
     "opencode:ses_0827527a9ffe4PsOWd65lIQ7TL"
   ],
@@ -447,7 +488,48 @@
       "status": "completed",
       "ended_at": "2026-07-20T11:32:23.888Z",
       "elapsed_ms": 15725
+    },
+    "todo:20": {
+      "task_key": "todo:20",
+      "task_label": "20",
+      "task_title": "集成测试",
+      "session_id": "opencode:ses_080b2c129ffe6hhdcZMv2GEGmx",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-07-20T11:37:47.313Z",
+      "started_at": "2026-07-20T11:37:29.131Z",
+      "status": "completed",
+      "ended_at": "2026-07-20T11:37:47.313Z",
+      "elapsed_ms": 18182
+    },
+    "todo:21": {
+      "task_key": "todo:21",
+      "task_label": "21",
+      "task_title": "文档编写",
+      "session_id": "opencode:ses_080ade2f8ffeVAzfGMU4kJZRF4",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-07-20T11:43:19.028Z",
+      "started_at": "2026-07-20T11:43:03.022Z",
+      "status": "completed",
+      "ended_at": "2026-07-20T11:43:19.028Z",
+      "elapsed_ms": 16006
+    },
+    "todo:22": {
+      "task_key": "todo:22",
+      "task_label": "22",
+      "task_title": "发布打包",
+      "session_id": "opencode:ses_080a85655ffe5HEbidiqKtQ8jb",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-07-20T11:47:48.808Z",
+      "started_at": "2026-07-20T11:47:33.337Z",
+      "status": "completed",
+      "ended_at": "2026-07-20T11:47:48.808Z",
+      "elapsed_ms": 15471
     }
   },
-  "agent": "atlas"
+  "agent": "atlas",
+  "ended_at": "2026-07-20T12:14:13.223Z",
+  "elapsed_ms": 30266714
 }

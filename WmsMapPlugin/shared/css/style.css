@@ -115,6 +115,127 @@ button:active {
   text-align: center;
 }
 
+/* 图层管理区样式 */
+.layer-input-group {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.layer-input-group input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.layer-input-group button {
+  width: auto;
+  padding: 6px 12px;
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+.layer-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: white;
+  margin-bottom: 6px;
+}
+
+.layer-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  gap: 6px;
+}
+
+.layer-item:last-child {
+  border-bottom: none;
+}
+
+.layer-item input[type="checkbox"] {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.layer-name {
+  flex: 1;
+  font-size: 12px;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-delete-layer {
+  width: auto;
+  padding: 2px 6px;
+  margin-top: 0;
+  background: #dc3545;
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.btn-delete-layer:hover {
+  background: #c82333;
+}
+
+.layer-empty {
+  padding: 12px;
+  text-align: center;
+  color: #999;
+  font-size: 12px;
+}
+
+/* 投影输入区样式 */
+.proj-input-group {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.proj-input-group input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.proj-input-group button {
+  width: auto;
+  padding: 6px 10px;
+  margin-top: 0;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.proj-info {
+  font-size: 12px;
+  color: #666;
+  padding: 4px 0;
+}
+
+/* 按钮样式 */
+.btn-primary {
+  background: #4a90d9;
+}
+
+.btn-secondary {
+  background: #28a745;
+  font-size: 12px;
+}
+
+.btn-secondary:hover {
+  background: #218838;
+}
+
 /* Responsive: minimum width 300px */
 @media (max-width: 600px) {
   #app {

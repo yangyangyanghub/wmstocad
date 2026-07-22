@@ -11,24 +11,38 @@
   <div id="app">
     <div id="map"></div>
     <div id="control-panel">
+      <!-- 图层管理 -->
       <div class="panel-section">
-        <h3>图层</h3>
-        <select id="layer-select"></select>
-        <button id="refresh-layers">刷新配置</button>
-      </div>
-      <div class="panel-section">
-        <h3>投影</h3>
-        <select id="projection-select"></select>
-        <div id="custom-proj-input" style="display:none;">
-          <input type="text" id="custom-proj4" placeholder="输入 proj4 字符串">
+        <h3>图层管理</h3>
+        <div class="layer-input-group">
+          <input type="text" id="wms-url-input" placeholder="输入 WMS 服务 URL" />
+          <button id="btn-add-layer" title="添加图层">添加</button>
         </div>
+        <div id="layer-list" class="layer-list">
+          <!-- 动态生成的图层项 -->
+        </div>
+        <button id="btn-refresh-capabilities" class="btn-secondary">获取图层信息</button>
+        <button id="btn-zoom-layer" class="btn-secondary">缩放至图层</button>
       </div>
+
+      <!-- 投影设置 -->
+      <div class="panel-section">
+        <h3>投影设置</h3>
+        <div class="proj-input-group">
+          <input type="text" id="epsg-input" placeholder="EPSG 编号 (如 4534)" />
+          <button id="btn-query-epsg" title="从 epsg.io 查询">查询</button>
+          <button id="btn-apply-proj" title="应用投影">应用</button>
+        </div>
+        <div id="current-proj-info" class="proj-info">当前: EPSG:4490</div>
+        <select id="projection-select" style="display:none;"></select>
+      </div>
+
+      <!-- 出图 -->
       <div class="panel-section">
         <h3>出图</h3>
-        <button id="btn-getmap">GetMap 出图（高质量）</button>
-        <button id="btn-screenshot">快速截图</button>
-        <button id="btn-insert-map">插入地图到 CAD</button>
+        <button id="btn-insert-map" class="btn-primary">插入地图到 CAD</button>
       </div>
+
       <div id="status-bar">就绪</div>
     </div>
   </div>
@@ -46,7 +60,6 @@
   <script src="js/output.js"></script>
   <script src="js/error.js"></script>
   <script src="js/adapter.js"></script>
-
 
 </body>
 </html>

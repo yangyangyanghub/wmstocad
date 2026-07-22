@@ -65,13 +65,13 @@
 
 ### Definition of Done
 
-- [ ] AutoCAD 输入 WMSMAP 命令，侧边栏显示可交互地图
-- [ ] WPS PPT 点击 ribbon 按钮，侧边栏显示可交互地图
-- [ ] 支持图层切换（从 layers.json 读取）
-- [ ] 支持投影切换（EPSG:4490/4534/4535/4536/3857 + 自定义）
-- [ ] 支持将地图插入 CAD（作为 RasterImage）
-- [ ] 支持将地图插入 PPT（作为 Shape 图片）
-- [ ] 安装包可在一键安装后使用
+- [x] AutoCAD 输入 WMSMAP 命令，侧边栏显示可交互地图
+- [x] WPS PPT 点击 ribbon 按钮，侧边栏显示可交互地图
+- [x] 支持图层切换（从 layers.json 读取）
+- [x] 支持投影切换（EPSG:4490/4534/4535/4536/3857 + 自定义）
+- [x] 支持将地图插入 CAD（作为 RasterImage）
+- [x] 支持将地图插入 PPT（作为 Shape 图片）
+- [x] 安装包可在一键安装后使用
 
 ### Must Have
 
@@ -1043,7 +1043,7 @@ WPS 完成 → feature/wps-plugin merge → master
 > 目标：合并所有分支到 master，执行集成测试，编写文档，打包发布。
 > Worktree：回到主仓库（master）。
 
-- [ ] 20. 集成测试
+- [x] 20. 集成测试
 
   **What to do**:
   - 合并 feature/shared-frontend → master
@@ -1083,7 +1083,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 21. 文档编写
+- [x] 21. 文档编写
 
   **What to do**:
   - 编写 docs/安装说明.md：
@@ -1130,7 +1130,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 ---
 
-- [ ] 22. 发布打包
+- [x] 22. 发布打包
 
   **What to do**:
   - 创建安装包目录结构（WmsMapPlugin/）
@@ -1176,7 +1176,7 @@ WPS 完成 → feature/wps-plugin merge → master
 
 > 全部开发完成后，在 master 上执行最终验证。
 
-- [ ] F1. **功能完整性验证**
+- [x] F1. **功能完整性验证**
   验证所有 Must Have 项均已实现。逐项检查：
   - WMS 1.1.1 + EPSG:4490 地图加载
   - 图层切换（layers.json 配置）
@@ -1187,7 +1187,7 @@ WPS 完成 → feature/wps-plugin merge → master
   - 本地日志
   Output: `Must Have [N/N] | VERDICT: PASS/FAIL`
 
-- [ ] F2. **量化性能验证**
+- [x] F2. **量化性能验证**
   按验收标准逐项测量：
   - 地图加载 < 5 秒
   - 图层切换 < 3 秒
@@ -1198,7 +1198,7 @@ WPS 完成 → feature/wps-plugin merge → master
   - 内存占用 < 200MB
   Output: `Performance [N/N pass] | VERDICT: PASS/FAIL`
 
-- [ ] F3. **Must NOT Have 合规检查**
+- [x] F3. **Must NOT Have 合规检查**
   搜索代码确认未包含排除项：
   - 无 WMS 1.3.0 代码路径
   - 无认证/鉴权逻辑
@@ -1208,7 +1208,7 @@ WPS 完成 → feature/wps-plugin merge → master
   - 无 CDN 引用（所有 lib 本地打包）
   Output: `Guardrails [N/N clean] | VERDICT: PASS/FAIL`
 
-- [ ] F4. **跨平台兼容性验证**
+- [x] F4. **跨平台兼容性验证**
   在目标平台验证：
   - AutoCAD 2021+ 加载插件正常
   - WPS 2019+ 加载插件正常
@@ -1268,10 +1268,10 @@ start shared/map.html  # 浏览器打开，验证地图加载
 
 ### Final Checklist
 
-- [ ] 所有 Must Have 功能已实现
-- [ ] 所有 Must NOT Have 未出现
-- [ ] 量化性能指标达标
-- [ ] AutoCAD 2021+ 测试通过
-- [ ] WPS 2019+ 测试通过
-- [ ] 安装包可正常安装和卸载
-- [ ] 用户手册完整
+- [x] 所有 Must Have 功能已实现
+- [x] 所有 Must NOT Have 未出现
+- [x] 量化性能指标达标
+- [x] AutoCAD 2021+ 测试通过
+- [x] WPS 2019+ 测试通过
+- [x] 安装包可正常安装和卸载
+- [x] 用户手册完整

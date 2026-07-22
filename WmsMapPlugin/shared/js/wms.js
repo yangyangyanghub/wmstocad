@@ -1,137 +1,77 @@
-// WMS Map Plugin - WMS Layer Operations
-// Task 8: WMS 图层操作模块
-
+// wms.js - WMS 图层创建与叠加管理（支持多图层叠加）
 (function() {
   'use strict';
 
-  var currentLayer = null;
-  var currentServiceId = null;
-  var currentLayerName = null;
-  var requestTimer = null;
-
-  // 创建 WMS 图层
+  // 创建 WMS 图层（供 layers.js 调用）
+  // 返回 L.TileLayer.WMS 实例，CRS 跟随当前地图投影
   function createWmsLayer(service, layerName) {
-    return L.tileLayer.wms(service.url, {
+    var map = window.wmsMap;
+    if (!map) {
+      console.error('[WMS] 地图未初始化');
+      return null;
+    }
+
+    // 获取当前地图 CRS 编号
+    var currentCrs = map.options.crs && map.options.crs.code
+      ? map.options.crs.code
+      : 'EPSG:4490';
+
+    var isV130 = parseFloat(service.version || '1.1.1') >= 1.3;
+
+    var wmsParams = {
       layers: layerName,
       format: service.format || 'image/png',
       transparent: true,
-      version: service.version || '1.1.1',
-      srs: service.srs || 'EPSG:4490'
-    });
+      version: service.version || '1.1.1'
+    };
+
+    // WMS 1.1.1 用 srs，1.3.0 用 crs
+    if (isV130) {
+      wmsParams.crs = currentCrs;
+    } else {
+      wmsParams.srs = currentCrs;
+    }
+
+    console.log('[WMS] 创建图层:', layerName, 'CRS:', currentCrs, 'URL:', service.url);
+    return L.tileLayer.wms(service.url, wmsParams);
   }
 
-  // 带超时的 fetch 探测（用于检测 WMS 服务是否可达）
+  // 探测 WMS 服务可达性（5s 超时）
   function probeService(url, timeoutMs) {
     timeoutMs = timeoutMs || 5000;
     var controller = null;
-    var hasAbort = typeof AbortController !== 'undefined';
-
-    if (hasAbort) {
+    if (typeof AbortController !== 'undefined') {
       controller = new AbortController();
     }
-
     var timeoutId = setTimeout(function() {
       if (controller) controller.abort();
     }, timeoutMs);
 
-    var fetchOpts = controller ? { signal: controller.signal } : {};
-
-    return fetch(url, fetchOpts)
-      .then(function(resp) {
-        clearTimeout(timeoutId);
-        return resp;
-      })
-      .catch(function(err) {
-        clearTimeout(timeoutId);
-        throw err;
-      });
+    return fetch(url, controller ? { signal: controller.signal } : {})
+      .then(function(resp) { clearTimeout(timeoutId); return resp; })
+      .catch(function(err) { clearTimeout(timeoutId); throw err; });
   }
 
-  // 切换图层（带 300ms 防抖 + 1 次重试）
-  function switchLayer(serviceId, layerName) {
-    if (requestTimer) {
-      clearTimeout(requestTimer);
-    }
+  // 刷新所有可见图层（投影切换后调用）
+  function refreshAllLayers() {
+    if (!window.wmsLayers) return;
+    var visibleLayers = window.wmsLayers.getVisibleLayers();
 
-    return new Promise(function(resolve, reject) {
-      requestTimer = setTimeout(function() {
-        doSwitch(serviceId, layerName, 0)
-          .then(resolve)
-          .catch(reject);
-      }, 300);
+    // 先关闭所有可见图层，再重新打开
+    visibleLayers.forEach(function(item) {
+      window.wmsLayers.toggleLayer(item.service.id, item.layer.name, false);
     });
-  }
-
-  // 实际切换逻辑（含重试）
-  function doSwitch(serviceId, layerName, retryCount) {
-    var map = window.wmsMap;
-    if (!map) {
-      return Promise.reject(new Error('地图未初始化'));
-    }
-
-    var service = window.wmsLayers ? window.wmsLayers.findService(serviceId) : null;
-    if (!service) {
-      return Promise.reject(new Error('服务未找到: ' + serviceId));
-    }
-
-    // 移除旧图层
-    if (currentLayer) {
-      map.removeLayer(currentLayer);
-      currentLayer = null;
-    }
-
-    // 创建新图层
-    var newLayer = createWmsLayer(service, layerName);
-
-    // 探测服务可达性（超时 5s）
-    return probeService(service.url)
-      .then(function() {
-        newLayer.addTo(map);
-        currentLayer = newLayer;
-        currentServiceId = serviceId;
-        currentLayerName = layerName;
-
-        // 同步全局引用
-        window.wmsLayer = newLayer;
-
-        console.log('WMS layer switched:', serviceId + '/' + layerName);
-        return true;
-      })
-      .catch(function(err) {
-        // 超时或网络错误：重试 1 次
-        if (retryCount < 1) {
-          console.warn('WMS 请求失败，重试中...', err);
-          return doSwitch(serviceId, layerName, retryCount + 1);
-        }
-        console.error('WMS 请求失败（已重试）:', err);
-        throw new Error('地图服务连接失败');
-      });
-  }
-
-  // 获取当前图层
-  function getCurrentLayer() {
-    return currentLayer;
-  }
-
-  // 获取当前服务 ID
-  function getCurrentServiceId() {
-    return currentServiceId;
-  }
-
-  // 获取当前图层名
-  function getCurrentLayerName() {
-    return currentLayerName;
+    visibleLayers.forEach(function(item) {
+      window.wmsLayers.toggleLayer(item.service.id, item.layer.name, true);
+    });
   }
 
   // 暴露全局 API
   window.wmsWms = {
-    switchLayer: switchLayer,
-    createLayer: createWmsLayer,
-    getCurrentLayer: getCurrentLayer,
-    getCurrentServiceId: getCurrentServiceId,
-    getCurrentLayerName: getCurrentLayerName
+    createWmsLayer: createWmsLayer,
+    probeService: probeService,
+    refreshAllLayers: refreshAllLayers
   };
 
-  console.log('WMS module initialized');
-
+  console.log('[WMS] 模块初始化完成');
 })();

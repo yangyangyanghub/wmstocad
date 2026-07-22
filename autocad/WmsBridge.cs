@@ -24,9 +24,7 @@ namespace WmsMapPlugin
   {
     private readonly WebView2 webView;
     private readonly JavaScriptSerializer jsonSerializer;
-    private readonly string logFilePath;
     private readonly string layersJsonPath;
-    private readonly object logLock = new object();
     private readonly WmsImageInserter imageInserter;
     private FileSystemWatcher layersWatcher;
     private DateTime lastLayersNotify = DateTime.MinValue;
@@ -41,22 +39,12 @@ namespace WmsMapPlugin
       this.jsonSerializer = new JavaScriptSerializer();
       this.jsonSerializer.MaxJsonLength = int.MaxValue;
 
-      // 日志文件路径：DLL 所在目录下的 logs/autocad-plugin.log
+      // layers.json 路径：部署后 shared/ 在 DLL 同级目录下（Contents/shared/）
       string dllDir = Path.GetDirectoryName(typeof(WmsBridge).Assembly.Location);
-      string logDir = Path.Combine(dllDir, "logs");
-      if (!Directory.Exists(logDir))
-      {
-        Directory.CreateDirectory(logDir);
-      }
-      this.logFilePath = Path.Combine(logDir, "autocad-plugin.log");
+      this.layersJsonPath = Path.Combine(dllDir, "shared", "layers.json");
 
-      // layers.json 路径：项目根目录 shared/layers.json
-      // DLL 位于 autocad/bin/ 下，shared/ 在项目根目录
-      string projectRoot = Path.GetFullPath(Path.Combine(dllDir, "..", ".."));
-      this.layersJsonPath = Path.Combine(projectRoot, "shared", "layers.json");
-
-      // 初始化图片插入器，日志回调使用 WriteLog
-      this.imageInserter = new WmsImageInserter((level, msg) => WriteLog(level, msg));
+      // 初始化图片插入器，日志回调走共享 Logger
+      this.imageInserter = new WmsImageInserter((level, msg) => Logger.Write(level, msg));
 
       // 启动 layers.json 文件监控
       StartLayersWatcher();
@@ -79,14 +67,14 @@ namespace WmsMapPlugin
         var message = jsonSerializer.Deserialize<Dictionary<string, object>>(messageJson);
         if (message == null || !message.ContainsKey("type"))
         {
-          WriteLog("WARN", "收到无效消息: " + messageJson);
+          Logger.Write("WARN", "收到无效消息: " + messageJson);
           return;
         }
 
         string type = message["type"] as string;
         if (string.IsNullOrEmpty(type))
         {
-          WriteLog("WARN", "消息缺少 type 字段");
+          Logger.Write("WARN", "消息缺少 type 字段");
           return;
         }
 
@@ -110,14 +98,20 @@ namespace WmsMapPlugin
           case "refresh":
             HandleRefresh(message);
             break;
+          case "layersChanged":
+            HandleLayersChanged(message);
+            break;
+          case "backgroundImage":
+            HandleBackgroundImage(message);
+            break;
           default:
-            WriteLog("WARN", "未知消息类型: " + type);
+            Logger.Write("WARN", "未知消息类型: " + type);
             break;
         }
       }
       catch (Exception ex)
       {
-        WriteLog("ERROR", "处理 WebMessage 异常: " + ex.Message);
+        Logger.Write("ERROR", "处理 WebMessage 异常: " + ex.ToString());
       }
     }
 
@@ -130,7 +124,7 @@ namespace WmsMapPlugin
     {
       if (webView == null || webView.CoreWebView2 == null)
       {
-        WriteLog("WARN", "WebView2 未初始化，无法发送消息到 JS");
+        Logger.Write("WARN", "WebView2 未初始化，无法发送消息到 JS");
         return;
       }
 
@@ -143,7 +137,7 @@ namespace WmsMapPlugin
       }
       catch (Exception ex)
       {
-        WriteLog("ERROR", "SendToJs 失败: " + ex.Message);
+        Logger.Write("ERROR", "SendToJs 失败: " + ex.ToString());
       }
     }
 
@@ -156,7 +150,7 @@ namespace WmsMapPlugin
       {
         if (!File.Exists(layersJsonPath))
         {
-          WriteLog("ERROR", "layers.json 不存在: " + layersJsonPath);
+          Logger.Write("ERROR", "layers.json 不存在: " + layersJsonPath);
           SendToJs(jsonSerializer.Serialize(new { type = "error", message = "配置文件不存在" }));
           return;
         }
@@ -166,7 +160,7 @@ namespace WmsMapPlugin
         var config = jsonSerializer.Deserialize<Dictionary<string, object>>(jsonContent);
         if (config == null)
         {
-          WriteLog("ERROR", "layers.json 解析失败");
+          Logger.Write("ERROR", "layers.json 解析失败");
           return;
         }
 
@@ -178,11 +172,11 @@ namespace WmsMapPlugin
         };
         string messageJson = jsonSerializer.Serialize(message);
         SendToJs(messageJson);
-        WriteLog("INFO", "已发送 layers.json 配置到前端");
+        Logger.Write("INFO", "已发送 layers.json 配置到前端");
       }
       catch (Exception ex)
       {
-        WriteLog("ERROR", "发送 layers.json 失败: " + ex.Message);
+        Logger.Write("ERROR", "发送 layers.json 失败: " + ex.ToString());
       }
     }
 
@@ -191,7 +185,7 @@ namespace WmsMapPlugin
     /// </summary>
     private void HandleReady(Dictionary<string, object> message)
     {
-      WriteLog("INFO", "前端已就绪，发送配置");
+      Logger.Write("INFO", "前端已就绪，发送配置");
       SendLayersConfig();
     }
 
@@ -202,7 +196,7 @@ namespace WmsMapPlugin
     {
       string level = message.ContainsKey("level") ? message["level"] as string : "INFO";
       string msg = message.ContainsKey("message") ? message["message"] as string : "";
-      WriteLog(level ?? "INFO", "[JS] " + (msg ?? ""));
+      Logger.Write(level ?? "INFO", "[JS] " + (msg ?? ""));
     }
 
     /// <summary>
@@ -211,7 +205,7 @@ namespace WmsMapPlugin
     private void HandleError(Dictionary<string, object> message)
     {
       string errorMsg = message.ContainsKey("message") ? message["message"] as string : "未知错误";
-      WriteLog("ERROR", "[JS] " + errorMsg);
+      Logger.Write("ERROR", "[JS] " + errorMsg);
 
       // 在 AutoCAD 状态栏显示提示
       try
@@ -224,7 +218,7 @@ namespace WmsMapPlugin
       }
       catch (Exception ex)
       {
-        WriteLog("ERROR", "显示状态栏提示失败: " + ex.Message);
+        Logger.Write("ERROR", "显示状态栏提示失败: " + ex.Message);
       }
     }
 
@@ -239,7 +233,15 @@ namespace WmsMapPlugin
 
       if (string.IsNullOrEmpty(base64Data))
       {
-        WriteLog("WARN", "收到空图片数据");
+        Logger.Write("WARN", "收到空图片数据");
+        return;
+      }
+
+      // 清洗 filename：剥离目录部分，防止路径注入（如 "..\..\evil.png" 被剥成 "evil.png"）
+      filename = Path.GetFileName(filename);
+      if (string.IsNullOrEmpty(filename) || filename.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+      {
+        Logger.Write("WARN", "非法的 filename，已拒绝保存图片");
         return;
       }
 
@@ -264,7 +266,7 @@ namespace WmsMapPlugin
 
         string outputPath = Path.Combine(outputDir, filename);
         File.WriteAllBytes(outputPath, imageBytes);
-        WriteLog("INFO", "图片已保存: " + outputPath);
+        Logger.Write("INFO", "图片已保存: " + outputPath);
 
         // 构造返回结果
         var result = new Dictionary<string, object>
@@ -276,7 +278,8 @@ namespace WmsMapPlugin
         // 如果 autoInsert 为 true 或消息来自"插入地图"按钮，则插入到 CAD
         if (autoInsert)
         {
-          var insertResult = imageInserter.InsertImage(base64Data, filename);
+          var insertResult = imageInserter.InsertImage(base64Data, filename,
+            null, null, null, null, null, 800, 600);
           result["inserted"] = insertResult.Success;
           result["insertMessage"] = insertResult.Message;
           if (insertResult.Success)
@@ -290,7 +293,7 @@ namespace WmsMapPlugin
       }
       catch (Exception ex)
       {
-        WriteLog("ERROR", "保存图片失败: " + ex.Message);
+        Logger.Write("ERROR", "保存图片失败: " + ex.Message);
       }
     }
 
@@ -299,12 +302,13 @@ namespace WmsMapPlugin
     /// </summary>
     private void HandleInsertImage(Dictionary<string, object> message)
     {
+      Logger.Write("INFO", "收到 insertImage 消息，开始插入图片到 CAD");
       string base64Data = message.ContainsKey("data") ? message["data"] as string : null;
       string filename = message.ContainsKey("filename") ? message["filename"] as string : "insert.png";
 
       if (string.IsNullOrEmpty(base64Data))
       {
-        WriteLog("WARN", "插入图片消息缺少数据");
+        Logger.Write("WARN", "插入图片消息缺少数据");
         SendToJs(jsonSerializer.Serialize(new Dictionary<string, object>
         {
           { "type", "insertResult" },
@@ -314,9 +318,38 @@ namespace WmsMapPlugin
         return;
       }
 
+      // 解析地理范围信息（用于 CAD 地理配准插入）
+      double? geoMinX = null, geoMinY = null, geoMaxX = null, geoMaxY = null;
+      string crs = null;
+      int imgWidth = 800, imgHeight = 600;
+
+      if (message.ContainsKey("geoBounds") && message["geoBounds"] is Dictionary<string, object> geoBounds)
+      {
+        geoMinX = ParseDouble(geoBounds, "minX");
+        geoMinY = ParseDouble(geoBounds, "minY");
+        geoMaxX = ParseDouble(geoBounds, "maxX");
+        geoMaxY = ParseDouble(geoBounds, "maxY");
+        Logger.Write("INFO", string.Format("地理范围: ({0:F2},{1:F2})-({2:F2},{3:F2})",
+          geoMinX ?? 0, geoMinY ?? 0, geoMaxX ?? 0, geoMaxY ?? 0));
+      }
+      if (message.ContainsKey("crs"))
+      {
+        crs = message["crs"] as string;
+        Logger.Write("INFO", "坐标系: " + crs);
+      }
+      if (message.ContainsKey("width") && message["width"] != null)
+      {
+        int.TryParse(message["width"].ToString(), out imgWidth);
+      }
+      if (message.ContainsKey("height") && message["height"] != null)
+      {
+        int.TryParse(message["height"].ToString(), out imgHeight);
+      }
+
       try
       {
-        var insertResult = imageInserter.InsertImage(base64Data, filename);
+        var insertResult = imageInserter.InsertImage(base64Data, filename,
+          geoMinX, geoMinY, geoMaxX, geoMaxY, crs, imgWidth, imgHeight);
 
         var result = new Dictionary<string, object>
         {
@@ -335,7 +368,7 @@ namespace WmsMapPlugin
       }
       catch (Exception ex)
       {
-        WriteLog("ERROR", "插入图片失败: " + ex.Message);
+        Logger.Write("ERROR", "插入图片失败: " + ex.Message);
         SendToJs(jsonSerializer.Serialize(new Dictionary<string, object>
         {
           { "type", "insertResult" },
@@ -346,12 +379,149 @@ namespace WmsMapPlugin
     }
 
     /// <summary>
+    /// 从字典中安全解析 double 值
+    /// </summary>
+    private static double? ParseDouble(Dictionary<string, object> dict, string key)
+    {
+      if (!dict.ContainsKey(key) || dict[key] == null) return null;
+      double val;
+      if (double.TryParse(dict[key].ToString(), out val)) return val;
+      return null;
+    }
+
+    /// <summary>
     /// 处理前端刷新配置请求：重新读取 layers.json 并发送
     /// </summary>
     private void HandleRefresh(Dictionary<string, object> message)
     {
-      WriteLog("INFO", "收到前端刷新配置请求");
+      Logger.Write("INFO", "收到前端刷新配置请求");
       SendLayersConfig();
+    }
+
+    /// <summary>
+    /// 处理前端图层可见性变化消息：更新 C# 端活动图层列表，触发 TransientManager 动态背景刷新
+    /// 消息格式: { type: 'layersChanged', layers: [{url, layerName, crs, format}, ...] }
+    /// </summary>
+    private void HandleLayersChanged(Dictionary<string, object> message)
+    {
+      try
+      {
+        var layers = new List<WmsLayerInfo>();
+
+        if (message.ContainsKey("layers") && message["layers"] is System.Collections.ArrayList arrList)
+        {
+          foreach (var item in arrList)
+          {
+            var dict = item as Dictionary<string, object>;
+            if (dict == null) continue;
+
+            layers.Add(new WmsLayerInfo
+            {
+              Url = dict.ContainsKey("url") ? dict["url"] as string : "",
+              LayerName = dict.ContainsKey("layerName") ? dict["layerName"] as string : "",
+              Crs = dict.ContainsKey("crs") ? dict["crs"] as string : "EPSG:4490",
+              Format = dict.ContainsKey("format") ? dict["format"] as string : "image/png"
+            });
+          }
+        }
+
+        Logger.Write("INFO", "收到 layersChanged 消息: " + layers.Count + " 个可见图层");
+
+        // 更新背景管理器的活动图层列表
+        var bgManager = WmsMapCommand.GetBackgroundManager();
+        if (bgManager != null)
+        {
+          bgManager.UpdateActiveLayers(layers);
+        }
+        else
+        {
+          Logger.Write("WARN", "背景管理器未初始化，无法更新图层");
+        }
+      }
+      catch (Exception ex)
+      {
+        Logger.Write("ERROR", "处理 layersChanged 失败: " + ex.Message);
+      }
+    }
+
+    /// <summary>
+    /// 处理前端发来的背景图片（WMS 影像 base64），更新 TransientManager 动态背景
+    /// 消息格式: { type: 'backgroundImage', data: base64, minX, minY, width, height }
+    /// </summary>
+    private void HandleBackgroundImage(Dictionary<string, object> message)
+    {
+      try
+      {
+        string base64Data = message.ContainsKey("data") ? message["data"] as string : null;
+        if (string.IsNullOrEmpty(base64Data))
+        {
+          Logger.Write("WARN", "backgroundImage 消息缺少 data");
+          return;
+        }
+
+        double minX = ParseDouble(message, "minX") ?? 0;
+        double minY = ParseDouble(message, "minY") ?? 0;
+        double width = ParseDouble(message, "width") ?? 0;
+        double height = ParseDouble(message, "height") ?? 0;
+
+        var bgManager = WmsMapCommand.GetBackgroundManager();
+        if (bgManager != null)
+        {
+          bgManager.UpdateBackgroundFromBase64(base64Data, minX, minY, width, height);
+        }
+      }
+      catch (Exception ex)
+      {
+        Logger.Write("ERROR", "处理 backgroundImage 失败: " + ex.Message);
+      }
+    }
+
+    /// <summary>
+    /// 设置背景管理器的视图范围变化回调（推送 CAD 视图范围到前端）
+    /// 在 WmsPanel 初始化 WebView2 后调用
+    /// </summary>
+    public void SetupBackgroundCallback()
+    {
+      var bgManager = WmsMapCommand.GetBackgroundManager();
+      if (bgManager == null || webView == null || webView.CoreWebView2 == null) return;
+
+      bgManager.ViewBoundsChangedHandler = (minX, minY, maxX, maxY, crs) =>
+      {
+        try
+        {
+          // Timer 回调在后台线程，WebView2 必须在 UI 线程访问
+          // 用 Control.Invoke 封送到 UI 线程
+          if (webView.InvokeRequired)
+          {
+            webView.Invoke(new Action(() =>
+            {
+              PushViewBoundsScript(minX, minY, maxX, maxY, crs);
+            }));
+          }
+          else
+          {
+            PushViewBoundsScript(minX, minY, maxX, maxY, crs);
+          }
+        }
+        catch (Exception ex)
+        {
+          Logger.Write("ERROR", "推送视图范围到前端失败: " + ex.Message);
+        }
+      };
+
+      Logger.Write("INFO", "背景管理器视图范围回调已设置");
+    }
+
+    /// <summary>
+    /// 在 UI 线程上推送视图范围脚本到前端
+    /// </summary>
+    private void PushViewBoundsScript(double minX, double minY, double maxX, double maxY, string crs)
+    {
+      if (webView == null || webView.CoreWebView2 == null) return;
+      string script = string.Format(
+        "window.wmsAdapter && window.wmsAdapter.onViewChanged && window.wmsAdapter.onViewChanged({0:F6},{1:F6},{2:F6},{3:F6},'{4}');",
+        minX, minY, maxX, maxY, crs);
+      webView.CoreWebView2.ExecuteScriptAsync(script);
     }
 
     /// <summary>
@@ -367,7 +537,7 @@ namespace WmsMapPlugin
 
         if (!Directory.Exists(watchDir))
         {
-          WriteLog("WARN", "layers.json 监控目录不存在: " + watchDir);
+          Logger.Write("WARN", "layers.json 监控目录不存在: " + watchDir);
           return;
         }
 
@@ -378,11 +548,11 @@ namespace WmsMapPlugin
         };
 
         layersWatcher.Changed += OnLayersFileChanged;
-        WriteLog("INFO", "已启动 layers.json 文件监控: " + layersJsonPath);
+        Logger.Write("INFO", "已启动 layers.json 文件监控: " + layersJsonPath);
       }
       catch (Exception ex)
       {
-        WriteLog("WARN", "启动 layers.json 监控失败: " + ex.Message);
+        Logger.Write("WARN", "启动 layers.json 监控失败: " + ex.Message);
       }
     }
 
@@ -400,12 +570,12 @@ namespace WmsMapPlugin
 
       try
       {
-        WriteLog("INFO", "检测到 layers.json 变化，自动刷新配置");
+        Logger.Write("INFO", "检测到 layers.json 变化，自动刷新配置");
         SendLayersConfig();
       }
       catch (Exception ex)
       {
-        WriteLog("ERROR", "自动刷新配置失败: " + ex.Message);
+        Logger.Write("ERROR", "自动刷新配置失败: " + ex.Message);
       }
     }
 
@@ -422,34 +592,12 @@ namespace WmsMapPlugin
           layersWatcher.EnableRaisingEvents = false;
           layersWatcher.Dispose();
           layersWatcher = null;
-          WriteLog("INFO", "layers.json 文件监控已停止");
+          Logger.Write("INFO", "layers.json 文件监控已停止");
         }
       }
       catch (Exception ex)
       {
-        WriteLog("WARN", "停止文件监控异常: " + ex.Message);
-      }
-    }
-
-    /// <summary>
-    /// 写入日志文件
-    /// 格式：[timestamp] [level] message
-    /// </summary>
-    private void WriteLog(string level, string message)
-    {
-      try
-      {
-        string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-        string logLine = string.Format("[{0}] [{1}] {2}", timestamp, level, message);
-
-        lock (logLock)
-        {
-          File.AppendAllText(logFilePath, logLine + Environment.NewLine, Encoding.UTF8);
-        }
-      }
-      catch
-      {
-        // 日志写入失败不应影响主流程
+        Logger.Write("WARN", "停止文件监控异常: " + ex.Message);
       }
     }
   }
