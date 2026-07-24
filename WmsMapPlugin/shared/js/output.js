@@ -97,7 +97,7 @@
       })
       .then(function(blob) {
         hostLog('INFO', 'GetMap Blob 大小: ' + blob.size + ' bytes');
-        if (blob.size < 1000) {
+        if (blob.size < window.WMS_MIN_IMAGE_SIZE) {
           throw new Error('服务返回空白或错误图片: ' + blob.size + ' bytes');
         }
         return blob;

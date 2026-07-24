@@ -15,6 +15,9 @@ namespace WmsMapPlugin
   /// </summary>
   public class WmsImageInserter
   {
+    // WMS 返回图片的有效性最小阈值（bytes），低于此值视为错误响应
+    private const int MinImageSize = 1000;
+
     private readonly Action<string, string> logAction;
 
     /// <summary>
@@ -64,7 +67,7 @@ namespace WmsMapPlugin
         }
 
         logAction("INFO", string.Format("图片解码成功，大小: {0} bytes", imageBytes.Length));
-        if (imageBytes.Length < 1000)
+        if (imageBytes.Length < MinImageSize)
         {
           logAction("WARN", "插入图片失败：图片过小，疑似 WMS 空白/错误响应");
           return new InsertResult { Success = false, Message = "WMS 返回空白或错误图片" };

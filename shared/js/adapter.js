@@ -310,11 +310,16 @@
     fetch(wmsUrl)
       .then(function(resp) {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        // 校验 Content-Type，防止 WMS 错误 XML 被当作图片处理
+        var contentType = resp.headers.get('content-type') || '';
+        if (contentType.indexOf('image') === -1) {
+          throw new Error('响应非图片格式: ' + contentType);
+        }
         return resp.blob();
       })
       .then(function(blob) {
         // 检查图片是否有效（太小说明 WMS 返回了错误而非图片）
-        if (blob.size < 1000) {
+        if (blob.size < window.WMS_MIN_IMAGE_SIZE) {
           console.warn('[Adapter] WMS 返回图片太小 (' + blob.size + ' bytes)，可能是错误响应，跳过');
           sendLog('WARN', '动态背景 WMS 返回图片太小，已跳过: ' + blob.size + ' bytes');
           return null;

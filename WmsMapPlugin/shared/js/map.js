@@ -4,6 +4,9 @@
 (function() {
   'use strict';
 
+  // WMS 返回图片的有效性最小阈值（bytes），低于此值视为错误响应
+  window.WMS_MIN_IMAGE_SIZE = 1000;
+
   // 1. 注册 EPSG:4490 投影定义
   proj4.defs("EPSG:4490", "+proj=longlat +ellps=GRS80 +no_defs +type=crs");
 

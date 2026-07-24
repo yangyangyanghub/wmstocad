@@ -41,6 +41,9 @@ namespace WmsMapPlugin
   /// </summary>
   public class MapBackgroundManager : IDisposable
   {
+    // WMS 返回图片的有效性最小阈值（bytes），低于此值视为错误响应
+    private const int MinImageSize = 1000;
+
     private Document doc;
     private List<WmsLayerInfo> activeLayers;
     private bool disposed;
@@ -181,7 +184,7 @@ namespace WmsMapPlugin
       {
         string pureBase64 = base64Data.Contains(",") ? base64Data.Substring(base64Data.IndexOf(",") + 1) : base64Data;
         byte[] imageBytes = Convert.FromBase64String(pureBase64);
-        if (imageBytes.Length < 1000)
+        if (imageBytes.Length < MinImageSize)
         {
           Logger.Write("WARN", "跳过背景更新：WMS 图片过小，疑似空白/错误响应 (" + imageBytes.Length + " bytes)");
           return;
