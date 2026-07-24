@@ -105,7 +105,45 @@ namespace WmsMapPlugin
         // 4. 插入到 CAD 模型空间（真正的 RasterImage API 调用）
         InsertToModelSpace(imagePath, insertX, insertY, widthMeters, heightMeters);
 
-        // 5. 在 AutoCAD 命令行输出提示
+        // 5. 隐藏图像边框（FRAME=0 对图纸内所有 RasterImage 生效，含动态背景图）
+        try
+        {
+          Application.SetSystemVariable("FRAME", 0);
+        }
+        catch (Exception ex)
+        {
+          logAction("WARN", "设置 FRAME=0 失败: " + ex.Message);
+        }
+
+        // 6. 自动缩放到影像实际范围（用户无需手动回车/缩放查找）
+        try
+        {
+          var editor = Application.DocumentManager.MdiActiveDocument.Editor;
+          var view = editor.GetCurrentView();
+          view.CenterPoint = new Point2d(insertX + widthMeters / 2, insertY + heightMeters / 2);
+          // 保持当前视口宽高比，取能容纳影像的尺寸（加 10% 边距）
+          double viewRatio = view.Width / view.Height;
+          double imgRatio = widthMeters / heightMeters;
+          if (imgRatio > viewRatio)
+          {
+            view.Width = widthMeters * 1.1;
+            view.Height = view.Width / viewRatio;
+          }
+          else
+          {
+            view.Height = heightMeters * 1.1;
+            view.Width = view.Height * viewRatio;
+          }
+          editor.SetCurrentView(view);
+          editor.Regen();
+          logAction("INFO", "已自动缩放到影像范围");
+        }
+        catch (Exception ex)
+        {
+          logAction("WARN", "自动缩放失败: " + ex.Message);
+        }
+
+        // 7. 在 AutoCAD 命令行输出提示
         NotifyUser(filename, widthMeters, heightMeters, crs);
 
         logAction("INFO", "图片已按地理坐标插入到 CAD 模型空间");

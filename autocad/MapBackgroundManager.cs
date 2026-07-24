@@ -328,6 +328,8 @@ namespace WmsMapPlugin
           }
           currentImagePath = imagePath;
           tr.Commit();
+          // 隐藏图像边框，避免背景图外框与插入影像的框叠加
+          try { Application.SetSystemVariable("FRAME", 0); } catch { }
           Logger.Write("INFO", "事务已提交，背景图层更新成功");
         }
         catch (Autodesk.AutoCAD.Runtime.Exception ex)
