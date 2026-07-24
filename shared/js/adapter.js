@@ -280,6 +280,12 @@
       }
     }
 
+    // 裁剪到有效经纬度范围（视图超出投影带时 proj4 会产生 Infinity）
+    swLng = Math.max(-180, Math.min(180, swLng));
+    neLng = Math.max(-180, Math.min(180, neLng));
+    swLat = Math.max(-90, Math.min(90, swLat));
+    neLat = Math.max(-90, Math.min(90, neLat));
+
     if (!isValidLngLatBbox(swLng, swLat, neLng, neLat)) {
       var invalidMsg = '动态背景跳过：CAD 视图坐标不是有效经纬度范围，bbox=' +
         [swLng, swLat, neLng, neLat].join(',');
@@ -288,14 +294,45 @@
       return;
     }
 
-    // 计算图片尺寸（基于视图宽高比）
-    var width = Math.min(1024, Math.max(256, Math.round(maxX - minX)));
-    var height = Math.min(768, Math.max(192, Math.round(maxY - minY)));
-
-    // 用第一个可见图层请求 WMS（WMS 服务固定用 EPSG:4490 经纬度 BBOX）
+    // 与图层数据范围（LatLonBoundingBox）求交集：只请求有数据的区域，
+    // 避免视图远大于图层覆盖时产生大面积空白背景
     var item = visibleLayers[0];
     var svc = item.service;
     var layerName = item.layer.name;
+    var lb = item.layer.bbox;
+    if (lb && lb.minx != null && lb.miny != null && lb.maxx != null && lb.maxy != null) {
+      var iSwLng = Math.max(swLng, lb.minx);
+      var iSwLat = Math.max(swLat, lb.miny);
+      var iNeLng = Math.min(neLng, lb.maxx);
+      var iNeLat = Math.min(neLat, lb.maxy);
+      if (iNeLng <= iSwLng || iNeLat <= iSwLat) {
+        console.log('[Adapter] 视图与图层数据范围不相交，跳过背景更新');
+        return;
+      }
+      swLng = iSwLng; swLat = iSwLat; neLng = iNeLng; neLat = iNeLat;
+    }
+
+    // 把（可能被裁剪的）经纬度范围转回 CAD 坐标，作为图片插入位置
+    var bgMinX, bgMinY, bgMaxX, bgMaxY;
+    if (srcCrs === 'EPSG:4490') {
+      bgMinX = swLng; bgMinY = swLat; bgMaxX = neLng; bgMaxY = neLat;
+    } else {
+      try {
+        var pb1 = proj4('EPSG:4490', srcCrs, [swLng, swLat]);
+        var pb2 = proj4('EPSG:4490', srcCrs, [neLng, neLat]);
+        bgMinX = pb1[0]; bgMinY = pb1[1]; bgMaxX = pb2[0]; bgMaxY = pb2[1];
+      } catch (e) {
+        console.error('[Adapter] 反向投影转换失败:', e);
+        return;
+      }
+    }
+
+    // 计算图片尺寸（按数据范围保持宽高比）
+    var spanX = Math.abs(bgMaxX - bgMinX);
+    var spanY = Math.abs(bgMaxY - bgMinY);
+    var width = Math.min(1024, Math.max(256, Math.round(spanX)));
+    var height = Math.min(768, Math.max(192, Math.round(width * spanY / spanX)));
+
     var bbox = swLng.toFixed(6) + ',' + swLat.toFixed(6) + ',' + neLng.toFixed(6) + ',' + neLat.toFixed(6);
 
     var query = 'SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap' +
@@ -334,14 +371,14 @@
       })
       .then(function(base64) {
         if (!base64) return; // 图片无效，跳过
-        // 发回 C# 端，包含 CAD 视图范围（用于 Transient 定位）
+        // 发回 C# 端，使用裁剪后的数据范围（而非整个 CAD 视图范围）
         sendToHost({
           type: 'backgroundImage',
           data: base64,
-          minX: minX,
-          minY: minY,
-          width: maxX - minX,
-          height: maxY - minY
+          minX: bgMinX,
+          minY: bgMinY,
+          width: spanX,
+          height: spanY
         });
       })
       .catch(function(err) {
