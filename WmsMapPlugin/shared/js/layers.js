@@ -346,8 +346,25 @@
     return services;
   }
 
+  // 更新图层下拉按钮的汇总文字
+  function updateLayerDropdownBtn() {
+    var btn = document.getElementById('layer-dropdown-btn');
+    if (!btn) return;
+    var total = 0, visible = 0;
+    services.forEach(function(svc) {
+      svc.layers.forEach(function(lyr) {
+        total++;
+        if (lyr.visible !== false) visible++;
+      });
+    });
+    btn.textContent = total === 0
+      ? '暂无图层（点击上方添加）'
+      : '图层列表（可见 ' + visible + '/' + total + '）';
+  }
+
   // 渲染图层列表 UI
   function renderLayerList() {
+    updateLayerDropdownBtn();
     var container = document.getElementById('layer-list');
     if (!container) return;
     container.innerHTML = '';
@@ -398,6 +415,18 @@
     var urlInput = document.getElementById('wms-url-input');
     var addBtn = document.getElementById('btn-add-layer');
     var refreshBtn = document.getElementById('btn-refresh-capabilities');
+
+    // 图层下拉折叠/展开（点击面板外部收起）
+    var ddBtn = document.getElementById('layer-dropdown-btn');
+    var ddPanel = document.getElementById('layer-dropdown-panel');
+    if (ddBtn && ddPanel) {
+      ddBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        ddPanel.style.display = ddPanel.style.display === 'none' ? 'block' : 'none';
+      });
+      ddPanel.addEventListener('click', function(e) { e.stopPropagation(); });
+      document.addEventListener('click', function() { ddPanel.style.display = 'none'; });
+    }
 
     if (addBtn) {
       addBtn.addEventListener('click', function() {

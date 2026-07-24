@@ -18,8 +18,14 @@
           <input type="text" id="wms-url-input" placeholder="输入 WMS 服务 URL" />
           <button id="btn-add-layer" title="添加图层">添加</button>
         </div>
-        <div id="layer-list" class="layer-list">
-          <!-- 动态生成的图层项 -->
+        <!-- 可折叠图层下拉：替代平铺列表，便于多图层管理 -->
+        <div class="proj-dropdown layer-dropdown" id="layer-dropdown">
+          <button type="button" id="layer-dropdown-btn" class="proj-dropdown-btn">暂无图层</button>
+          <div class="layer-dropdown-panel" id="layer-dropdown-panel" style="display:none;">
+            <div id="layer-list" class="layer-list">
+              <!-- 动态生成的图层项 -->
+            </div>
+          </div>
         </div>
         <button id="btn-refresh-capabilities" class="btn-secondary">获取图层信息</button>
         <button id="btn-zoom-layer" class="btn-secondary">缩放至图层</button>

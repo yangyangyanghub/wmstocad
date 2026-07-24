@@ -193,6 +193,16 @@ button:active {
   font-size: 12px;
 }
 
+/* 图层下拉（可折叠列表，替代平铺） */
+.layer-dropdown {
+  margin: 4px 0 6px;
+}
+
+.layer-dropdown-panel .layer-list {
+  margin-bottom: 0;
+  margin-top: 2px;
+}
+
 /* 投影输入区样式 */
 .proj-input-group {
   display: flex;
