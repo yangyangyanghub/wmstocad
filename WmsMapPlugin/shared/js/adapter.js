@@ -314,7 +314,7 @@
       })
       .then(function(blob) {
         // 检查图片是否有效（太小说明 WMS 返回了错误而非图片）
-        if (blob.size < 5000) {
+        if (blob.size < 1000) {
           console.warn('[Adapter] WMS 返回图片太小 (' + blob.size + ' bytes)，可能是错误响应，跳过');
           sendLog('WARN', '动态背景 WMS 返回图片太小，已跳过: ' + blob.size + ' bytes');
           return null;

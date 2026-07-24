@@ -181,7 +181,7 @@ namespace WmsMapPlugin
       {
         string pureBase64 = base64Data.Contains(",") ? base64Data.Substring(base64Data.IndexOf(",") + 1) : base64Data;
         byte[] imageBytes = Convert.FromBase64String(pureBase64);
-        if (imageBytes.Length < 5000)
+        if (imageBytes.Length < 1000)
         {
           Logger.Write("WARN", "跳过背景更新：WMS 图片过小，疑似空白/错误响应 (" + imageBytes.Length + " bytes)");
           return;

@@ -64,7 +64,7 @@ namespace WmsMapPlugin
         }
 
         logAction("INFO", string.Format("图片解码成功，大小: {0} bytes", imageBytes.Length));
-        if (imageBytes.Length < 5000)
+        if (imageBytes.Length < 1000)
         {
           logAction("WARN", "插入图片失败：图片过小，疑似 WMS 空白/错误响应");
           return new InsertResult { Success = false, Message = "WMS 返回空白或错误图片" };
