@@ -300,7 +300,8 @@
 
     var query = 'SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap' +
       '&LAYERS=' + encodeURIComponent(layerName) +
-      '&STYLES=&FORMAT=' + (svc.format || 'image/png') + '&TRANSPARENT=TRUE' +
+      '&STYLES=&FORMAT=' + (svc.format || 'image/png') + '&TRANSPARENT=FALSE' +
+      // 动态背景是不透明底图：透明区域在 AutoCAD 中渲染为黑色，会产生"黑框"
       '&BBOX=' + bbox + '&WIDTH=' + width + '&HEIGHT=' + height + '&SRS=EPSG:4490';
     var wmsUrl = appendQuery(svc.url, query);
 
