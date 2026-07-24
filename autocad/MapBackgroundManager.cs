@@ -29,6 +29,8 @@ namespace WmsMapPlugin
     public double MinY;
     public double Width;
     public double Height;
+    public int PixelWidth;
+    public int PixelHeight;
   }
 
   /// <summary>
@@ -136,7 +138,7 @@ namespace WmsMapPlugin
         {
           try
           {
-            UpdateRasterImage(update.ImagePath, update.MinX, update.MinY, update.Width, update.Height);
+            UpdateRasterImage(update);
           }
           finally
           {
@@ -190,6 +192,9 @@ namespace WmsMapPlugin
           return;
         }
 
+        // 解析 PNG 像素尺寸
+        PngSize png = ParsePngSize(imageBytes);
+
         // 写入临时文件（线程安全操作）
         string dllDir = Path.GetDirectoryName(typeof(MapBackgroundManager).Assembly.Location);
         string imageDir = Path.Combine(dllDir, "images");
@@ -205,7 +210,9 @@ namespace WmsMapPlugin
           MinX = minX,
           MinY = minY,
           Width = width,
-          Height = height
+          Height = height,
+          PixelWidth = png.Width,
+          PixelHeight = png.Height
         };
         lock (queueLock) { pendingImage = update; }
       }
@@ -221,9 +228,12 @@ namespace WmsMapPlugin
     /// 2. 删除旧图片文件
     /// 3. 创建新 RasterImageDef + RasterImage
     /// </summary>
-    private void UpdateRasterImage(string imagePath, double insertX, double insertY, double width, double height)
+    private void UpdateRasterImage(PendingImageUpdate pending)
     {
       Database db = doc.Database;
+      string imagePath = pending.ImagePath;
+      double insertX = pending.MinX;
+      double insertY = pending.MinY;
 
       // 步骤1：删除旧 RasterImage + RasterImageDef（单独事务）
       if (rasterImageId.IsValid && !rasterImageId.IsNull)
@@ -300,10 +310,13 @@ namespace WmsMapPlugin
             rasterImage.ImageDefId = imageDefId;
             Logger.Write("INFO", "ImageDefId 已设置");
 
+            // CoordinateSystem3d 的 uVector/vVector = 每像素世界坐标位移
+            double perPixelW = pending.Width / pending.PixelWidth;
+            double perPixelH = pending.Height / pending.PixelHeight;
             rasterImage.Orientation = new CoordinateSystem3d(
-              new Point3d(insertX, insertY, 0),
-              new Vector3d(width, 0, 0),
-              new Vector3d(0, height, 0));
+              new Point3d(pending.MinX, pending.MinY, 0),
+              new Vector3d(perPixelW, 0, 0),
+              new Vector3d(0, perPixelH, 0));
             Logger.Write("INFO", "Orientation 已设置");
 
             modelSpace.AppendEntity(rasterImage);
@@ -332,6 +345,28 @@ namespace WmsMapPlugin
           tr.Abort();
         }
       }
+    }
+
+    /// <summary>
+    /// PNG 像素尺寸
+    /// </summary>
+    private struct PngSize
+    {
+      public int Width;
+      public int Height;
+    }
+
+    /// <summary>
+    /// 从 PNG 字节数据解析像素尺寸（IHDR 块）
+    /// PNG 格式: 签名(8) + IHDR长度(4) + "IHDR"(4) + 宽度(4) + 高度(4)...
+    /// </summary>
+    private PngSize ParsePngSize(byte[] pngBytes)
+    {
+      if (pngBytes.Length < 24)
+        return new PngSize { Width = 256, Height = 256 };
+      int width = (pngBytes[16] << 24) | (pngBytes[17] << 16) | (pngBytes[18] << 8) | pngBytes[19];
+      int height = (pngBytes[20] << 24) | (pngBytes[21] << 16) | (pngBytes[22] << 8) | pngBytes[23];
+      return new PngSize { Width = width, Height = height };
     }
 
     /// <summary>

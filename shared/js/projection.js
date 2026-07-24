@@ -28,6 +28,12 @@
       unit: "米",
       resolutions: [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
     },
+    "EPSG:4526": {
+      name: "CGCS2000 / 3度带 111°E",
+      proj4: "+proj=tmerc +lat_0=0 +lon_0=111 +k=1 +x_0=37500000 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs",
+      unit: "米",
+      resolutions: [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
+    },
     "EPSG:3857": {
       name: "Web 墨卡托",
       proj4: "+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +no_defs +type=crs",
@@ -43,13 +49,23 @@
 
   var currentEpsg = 'EPSG:4490';
 
+  // 从 proj4 字符串解析 origin（false easting/northing）
+  function parseOrigin(proj4def) {
+    var x0 = 0, y0 = 0;
+    var xMatch = proj4def.match(/\+x_0=([-\d.]+)/);
+    var yMatch = proj4def.match(/\+y_0=([-\d.]+)/);
+    if (xMatch) x0 = parseFloat(xMatch[1]);
+    if (yMatch) y0 = parseFloat(yMatch[1]);
+    return [x0, y0];
+  }
+
   // 创建投影 CRS
   function createProjectedCrs(epsgCode, proj4def, resolutions) {
     if (!proj4.defs(epsgCode)) {
       proj4.defs(epsgCode, proj4def);
     }
     return new L.Proj.CRS(epsgCode, proj4def, {
-      origin: [0, 0],
+      origin: parseOrigin(proj4def),
       resolutions: resolutions || [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
     });
   }
@@ -160,6 +176,10 @@
 
     infoEl.textContent = '当前: ' + epsg + ' (' + name + ', 单位: ' + unit + ')';
     infoEl.title = proj4def || '';
+
+    // 同步下拉框选中状态
+    var select = document.getElementById('projection-select');
+    if (select) select.value = epsg;
   }
 
   // 从输入框查询并应用投影
@@ -236,6 +256,7 @@
     var queryBtn = document.getElementById('btn-query-epsg');
     var applyBtn = document.getElementById('btn-apply-proj');
     var epsgInput = document.getElementById('epsg-input');
+    var projSelect = document.getElementById('projection-select');
 
     if (queryBtn) {
       queryBtn.addEventListener('click', queryAndApplyProjection);
@@ -248,11 +269,36 @@
         if (e.key === 'Enter') queryAndApplyProjection();
       });
     }
+    if (projSelect) {
+      projSelect.addEventListener('change', function() {
+        var epsg = this.value;
+        if (!epsg) return;
+        var preset = presetProjections[epsg];
+        if (preset) {
+          switchProjection(epsg, preset.proj4, preset.resolutions);
+        }
+      });
+    }
+  }
+
+  // 初始化下拉框
+  function initProjectionSelect() {
+    var select = document.getElementById('projection-select');
+    if (!select) return;
+    var presets = listPresetProjections();
+    presets.forEach(function(p) {
+      var opt = document.createElement('option');
+      opt.value = p.epsg;
+      opt.textContent = p.name + ' (' + p.epsg + ')';
+      if (p.epsg === currentEpsg) opt.selected = true;
+      select.appendChild(opt);
+    });
   }
 
   // 初始化
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
+      initProjectionSelect();
       bindEvents();
       updateProjInfo(currentEpsg, presetProjections[currentEpsg].proj4);
     });

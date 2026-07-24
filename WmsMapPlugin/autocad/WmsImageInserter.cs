@@ -73,23 +73,35 @@ namespace WmsMapPlugin
           return new InsertResult { Success = false, Message = "WMS 返回空白或错误图片" };
         }
 
-        // 2. 持久化 PNG 文件到 Contents/images/ 目录（RasterImageDef 是链接引用，不能删除）
+        // 2. 解析 PNG 实际像素尺寸（CoordinateSystem3d 需要每像素位移）
+        PngDimensions pngSize;
+        try
+        {
+          pngSize = ParsePngDimensions(imageBytes);
+        }
+        catch (Exception ex)
+        {
+          logAction("WARN", "PNG 解析失败，使用传入尺寸: " + ex.Message);
+          pngSize = new PngDimensions { Width = imgWidth, Height = imgHeight };
+        }
+
+        // 3. 持久化 PNG 文件
         string imagePath = SavePersistentImage(imageBytes, filename);
         logAction("INFO", "图片已持久化: " + imagePath);
 
-        // 3. 计算地理范围（米）
+        // 4. 计算每像素世界坐标位移（CoordinateSystem3d 的 uVector/vVector = 每像素位移）
         double widthMeters, heightMeters;
         double insertX, insertY;
 
         if (geoMinX.HasValue && geoMinY.HasValue && geoMaxX.HasValue && geoMaxY.HasValue)
         {
-          // 使用前端传来的投影坐标（真实米制坐标）
           insertX = geoMinX.Value;
           insertY = geoMinY.Value;
-          widthMeters = geoMaxX.Value - geoMinX.Value;
-          heightMeters = geoMaxY.Value - geoMinY.Value;
-          logAction("INFO", string.Format("地理配准插入: 原点({0:F2},{1:F2}) 宽{2:F2}m 高{3:F2}m CRS={4}",
-            insertX, insertY, widthMeters, heightMeters, crs ?? "未知"));
+          // 地理范围 / 像素数 = 每像素世界坐标位移
+          widthMeters = (geoMaxX.Value - geoMinX.Value) / pngSize.Width;
+          heightMeters = (geoMaxY.Value - geoMinY.Value) / pngSize.Height;
+          logAction("INFO", string.Format("地理配准插入: 原点({0:F2},{1:F2}) 像素{2}x{3} 每像素{4:F4}×{5:F4} CRS={6}",
+            insertX, insertY, pngSize.Width, pngSize.Height, widthMeters, heightMeters, crs ?? "未知"));
         }
         else
         {
@@ -134,6 +146,29 @@ namespace WmsMapPlugin
         return base64Data.Substring(base64Data.IndexOf(",") + 1);
       }
       return base64Data;
+    }
+
+    /// <summary>
+    /// PNG 像素尺寸
+    /// </summary>
+    private struct PngDimensions
+    {
+      public int Width;
+      public int Height;
+    }
+
+    /// <summary>
+    /// 从 PNG 字节数据解析图像像素尺寸（读取 IHDR 块）
+    /// PNG 格式: 签名(8) + IHDR长度(4) + "IHDR"(4) + 宽度(4) + 高度(4)...
+    /// </summary>
+    private PngDimensions ParsePngDimensions(byte[] pngBytes)
+    {
+      if (pngBytes.Length < 24)
+        throw new ArgumentException("PNG 数据不足，无法解析");
+      // 宽度在偏移16-19，高度在20-23（big-endian uint32）
+      int width = (pngBytes[16] << 24) | (pngBytes[17] << 16) | (pngBytes[18] << 8) | pngBytes[19];
+      int height = (pngBytes[20] << 24) | (pngBytes[21] << 16) | (pngBytes[22] << 8) | pngBytes[23];
+      return new PngDimensions { Width = width, Height = height };
     }
 
     /// <summary>
