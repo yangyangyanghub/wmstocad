@@ -293,31 +293,12 @@
 
     if (!hasBbox) return false;
 
-    // LatLonBoundingBox 是 WGS84 经纬度
-    // 如果当前 CRS 是投影坐标系，需要 proj4 转换为投影坐标
-    var crs = map.options.crs;
-    var crsCode = crs && crs.code ? crs.code : 'EPSG:4490';
-    var isLatLng = crsCode === 'EPSG:4490' || crsCode === 'EPSG:4326';
-
-    if (isLatLng) {
-      var sw = L.latLng(minLat, minLng);
-      var ne = L.latLng(maxLat, maxLng);
-      map.fitBounds(L.latLngBounds(sw, ne), { padding: [20, 20] });
-    } else {
-      // 投影坐标系：proj4 将 WGS84 经纬度转为投影坐标（米）
-      try {
-        var swProj = proj4('EPSG:4490', crsCode, [minLng, minLat]);
-        var neProj = proj4('EPSG:4490', crsCode, [maxLng, maxLat]);
-        map.fitBounds(L.latLngBounds(
-          L.latLng(swProj[1], swProj[0]),
-          L.latLng(neProj[1], neProj[0])
-        ), { padding: [20, 20] });
-      } catch (e) {
-        console.error('[Layers] 投影转换失败，无法缩放', e);
-        return false;
-      }
-    }
-    console.log('[Layers] 已缩放至图层范围，CRS=' + crsCode);
+    // LatLonBoundingBox 是 WGS84 经纬度，直接传入 fitBounds
+    // Leaflet 的 CRS 会通过 projection.project() 自动完成坐标转换
+    var sw = L.latLng(minLat, minLng);
+    var ne = L.latLng(maxLat, maxLng);
+    map.fitBounds(L.latLngBounds(sw, ne), { padding: [20, 20] });
+    console.log('[Layers] 已缩放至图层范围');
     return true;
   }
 
