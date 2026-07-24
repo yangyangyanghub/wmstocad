@@ -73,19 +73,7 @@ namespace WmsMapPlugin
           return new InsertResult { Success = false, Message = "WMS 返回空白或错误图片" };
         }
 
-        // 2. 解析 PNG 实际像素尺寸（CoordinateSystem3d 需要每像素位移）
-        PngDimensions pngSize;
-        try
-        {
-          pngSize = ParsePngDimensions(imageBytes);
-        }
-        catch (Exception ex)
-        {
-          logAction("WARN", "PNG 解析失败，使用传入尺寸: " + ex.Message);
-          pngSize = new PngDimensions { Width = imgWidth, Height = imgHeight };
-        }
-
-        // 3. 持久化 PNG 文件
+        // 2. 持久化 PNG 文件
         string imagePath = SavePersistentImage(imageBytes, filename);
         logAction("INFO", "图片已持久化: " + imagePath);
 
@@ -97,11 +85,11 @@ namespace WmsMapPlugin
         {
           insertX = geoMinX.Value;
           insertY = geoMinY.Value;
-          // 地理范围 / 像素数 = 每像素世界坐标位移
-          widthMeters = (geoMaxX.Value - geoMinX.Value) / pngSize.Width;
-          heightMeters = (geoMaxY.Value - geoMinY.Value) / pngSize.Height;
-          logAction("INFO", string.Format("地理配准插入: 原点({0:F2},{1:F2}) 像素{2}x{3} 每像素{4:F4}×{5:F4} CRS={6}",
-            insertX, insertY, pngSize.Width, pngSize.Height, widthMeters, heightMeters, crs ?? "未知"));
+          // CoordinateSystem3d 的 uVector/vVector = 图片总宽度/总高度（世界坐标）
+          widthMeters = geoMaxX.Value - geoMinX.Value;
+          heightMeters = geoMaxY.Value - geoMinY.Value;
+          logAction("INFO", string.Format("地理配准插入: 原点({0:F2},{1:F2}) 宽{2:F2} 高{3:F2} CRS={4}",
+            insertX, insertY, widthMeters, heightMeters, crs ?? "未知"));
         }
         else
         {

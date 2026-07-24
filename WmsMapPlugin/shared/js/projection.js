@@ -303,6 +303,7 @@
       updateProjInfo(currentEpsg, presetProjections[currentEpsg].proj4);
     });
   } else {
+    initProjectionSelect();
     bindEvents();
     updateProjInfo(currentEpsg, presetProjections[currentEpsg].proj4);
   }

@@ -232,8 +232,6 @@ namespace WmsMapPlugin
     {
       Database db = doc.Database;
       string imagePath = pending.ImagePath;
-      double insertX = pending.MinX;
-      double insertY = pending.MinY;
 
       // 步骤1：删除旧 RasterImage + RasterImageDef（单独事务）
       if (rasterImageId.IsValid && !rasterImageId.IsNull)
@@ -310,13 +308,11 @@ namespace WmsMapPlugin
             rasterImage.ImageDefId = imageDefId;
             Logger.Write("INFO", "ImageDefId 已设置");
 
-            // CoordinateSystem3d 的 uVector/vVector = 每像素世界坐标位移
-            double perPixelW = pending.Width / pending.PixelWidth;
-            double perPixelH = pending.Height / pending.PixelHeight;
+            // CoordinateSystem3d 的 uVector/vVector = 图片总宽度/总高度（世界坐标）
             rasterImage.Orientation = new CoordinateSystem3d(
               new Point3d(pending.MinX, pending.MinY, 0),
-              new Vector3d(perPixelW, 0, 0),
-              new Vector3d(0, perPixelH, 0));
+              new Vector3d(pending.Width, 0, 0),
+              new Vector3d(0, pending.Height, 0));
             Logger.Write("INFO", "Orientation 已设置");
 
             modelSpace.AppendEntity(rasterImage);

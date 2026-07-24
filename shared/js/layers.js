@@ -293,8 +293,39 @@
 
     if (!hasBbox) return false;
 
-    // LatLonBoundingBox 是 WGS84 经纬度，直接传入 fitBounds
-    // Leaflet 的 CRS 会通过 projection.project() 自动完成坐标转换
+    // 获取当前 CRS 类型
+    var crs = map.options.crs;
+    var crsCode = crs && crs.code ? crs.code : 'EPSG:4490';
+    var isProjected = crsCode !== 'EPSG:4490' && crsCode !== 'EPSG:4326';
+
+    if (isProjected) {
+      // 投影坐标系：fitBounds 在 L.Proj.CRS 下不可靠，手动计算中心+缩放
+      try {
+        var center = L.latLng((minLat + maxLat) / 2, (minLng + maxLng) / 2);
+        var size = map.getSize();
+        var pad = 40; // 20px padding 两侧
+        var bestZoom = 0;
+        for (var z = 12; z >= 0; z--) {
+          var pSW = crs.latLngToPoint(L.latLng(minLat, minLng), z);
+          var pNE = crs.latLngToPoint(L.latLng(maxLat, maxLng), z);
+          if (!pSW || !pNE) continue;
+          var w = Math.abs(pNE.x - pSW.x);
+          var h = Math.abs(pNE.y - pSW.y);
+          if (w <= size.x - pad && h <= size.y - pad) {
+            bestZoom = z;
+            break;
+          }
+        }
+        map.setView(center, bestZoom);
+        console.log('[Layers] 投影CR下手动缩放至图层范围，zoom=' + bestZoom);
+        return true;
+      } catch (e) {
+        console.error('[Layers] 手动缩放失败', e);
+        return false;
+      }
+    }
+
+    // 地理坐标系：fitBounds 正常工作
     var sw = L.latLng(minLat, minLng);
     var ne = L.latLng(maxLat, maxLng);
     map.fitBounds(L.latLngBounds(sw, ne), { padding: [20, 20] });
