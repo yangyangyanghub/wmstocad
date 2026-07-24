@@ -29,8 +29,6 @@ namespace WmsMapPlugin
     public double MinY;
     public double Width;
     public double Height;
-    public int PixelWidth;
-    public int PixelHeight;
   }
 
   /// <summary>
@@ -192,14 +190,12 @@ namespace WmsMapPlugin
           return;
         }
 
-        // 解析 PNG 像素尺寸
-        PngSize png = ParsePngSize(imageBytes);
-
-        // 写入临时文件（线程安全操作）
+        // 写入临时文件（线程安全操作），按魔数区分 JPEG(FF D8) 与 PNG(89 50)
+        string ext = (imageBytes.Length >= 2 && imageBytes[0] == 0xFF && imageBytes[1] == 0xD8) ? ".jpg" : ".png";
         string dllDir = Path.GetDirectoryName(typeof(MapBackgroundManager).Assembly.Location);
         string imageDir = Path.Combine(dllDir, "images");
         if (!Directory.Exists(imageDir)) Directory.CreateDirectory(imageDir);
-        string imagePath = Path.Combine(imageDir, "bg_" + DateTime.Now.ToString("yyyyMMddHHmmssfff") + ".png");
+        string imagePath = Path.Combine(imageDir, "bg_" + DateTime.Now.ToString("yyyyMMddHHmmssfff") + ext);
         File.WriteAllBytes(imagePath, imageBytes);
         Logger.Write("INFO", "图片已写入: " + imagePath + " (" + imageBytes.Length + " bytes)");
 
@@ -210,9 +206,7 @@ namespace WmsMapPlugin
           MinX = minX,
           MinY = minY,
           Width = width,
-          Height = height,
-          PixelWidth = png.Width,
-          PixelHeight = png.Height
+          Height = height
         };
         lock (queueLock) { pendingImage = update; }
       }
@@ -343,28 +337,6 @@ namespace WmsMapPlugin
           tr.Abort();
         }
       }
-    }
-
-    /// <summary>
-    /// PNG 像素尺寸
-    /// </summary>
-    private struct PngSize
-    {
-      public int Width;
-      public int Height;
-    }
-
-    /// <summary>
-    /// 从 PNG 字节数据解析像素尺寸（IHDR 块）
-    /// PNG 格式: 签名(8) + IHDR长度(4) + "IHDR"(4) + 宽度(4) + 高度(4)...
-    /// </summary>
-    private PngSize ParsePngSize(byte[] pngBytes)
-    {
-      if (pngBytes.Length < 24)
-        return new PngSize { Width = 256, Height = 256 };
-      int width = (pngBytes[16] << 24) | (pngBytes[17] << 16) | (pngBytes[18] << 8) | pngBytes[19];
-      int height = (pngBytes[20] << 24) | (pngBytes[21] << 16) | (pngBytes[22] << 8) | pngBytes[23];
-      return new PngSize { Width = width, Height = height };
     }
 
     /// <summary>

@@ -175,29 +175,6 @@ namespace WmsMapPlugin
     }
 
     /// <summary>
-    /// PNG 像素尺寸
-    /// </summary>
-    private struct PngDimensions
-    {
-      public int Width;
-      public int Height;
-    }
-
-    /// <summary>
-    /// 从 PNG 字节数据解析图像像素尺寸（读取 IHDR 块）
-    /// PNG 格式: 签名(8) + IHDR长度(4) + "IHDR"(4) + 宽度(4) + 高度(4)...
-    /// </summary>
-    private PngDimensions ParsePngDimensions(byte[] pngBytes)
-    {
-      if (pngBytes.Length < 24)
-        throw new ArgumentException("PNG 数据不足，无法解析");
-      // 宽度在偏移16-19，高度在20-23（big-endian uint32）
-      int width = (pngBytes[16] << 24) | (pngBytes[17] << 16) | (pngBytes[18] << 8) | pngBytes[19];
-      int height = (pngBytes[20] << 24) | (pngBytes[21] << 16) | (pngBytes[22] << 8) | pngBytes[23];
-      return new PngDimensions { Width = width, Height = height };
-    }
-
-    /// <summary>
     /// 持久化图片到 Contents/images/ 目录（RasterImageDef 是链接引用，文件不能删除）
     /// </summary>
     private string SavePersistentImage(byte[] imageBytes, string filename)

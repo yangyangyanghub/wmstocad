@@ -252,6 +252,28 @@
     }
   }
 
+  // 背景图性能优化：视图去重 + WMS 响应 LRU 缓存
+  var lastBgKey = null;      // 上次已发送的视图 key（相同则跳过，打断"插入背景→ViewChanged→再请求"自触发循环）
+  var bgCache = new Map();   // key -> base64，平移回看时秒出
+  var BG_CACHE_MAX = 15;
+
+  function bgCacheGet(key) {
+    var v = bgCache.get(key);
+    if (v !== undefined) { bgCache.delete(key); bgCache.set(key, v); } // LRU 提升热度
+    return v;
+  }
+
+  function bgCacheSet(key, value) {
+    if (bgCache.size >= BG_CACHE_MAX) {
+      bgCache.delete(bgCache.keys().next().value); // 淘汰最久未用
+    }
+    bgCache.set(key, value);
+  }
+
+  function sendBackground(base64, minX, minY, w, h) {
+    sendToHost({ type: 'backgroundImage', data: base64, minX: minX, minY: minY, width: w, height: h });
+  }
+
   // CAD 视图变化回调（由 C# 通过 ExecuteScriptAsync 调用）
   // 接收 CAD 视图范围 -> proj4js 转经纬度 -> WMS GetMap -> 发回图片给 C#
   function onViewChanged(minX, minY, maxX, maxY, crs) {
@@ -335,10 +357,20 @@
 
     var bbox = swLng.toFixed(6) + ',' + swLat.toFixed(6) + ',' + neLng.toFixed(6) + ',' + neLat.toFixed(6);
 
+    // 性能优化：相同视图直接去重，命中缓存直接复用
+    var bgKey = srcCrs + '|' + layerName + '|' + bbox + '|' + width + 'x' + height;
+    if (bgKey === lastBgKey) return; // 视图未变化（含背景插入触发的 ViewChanged 回环），跳过
+    var cachedBase64 = bgCacheGet(bgKey);
+    if (cachedBase64) {
+      lastBgKey = bgKey;
+      sendBackground(cachedBase64, bgMinX, bgMinY, spanX, spanY);
+      return;
+    }
+
     var query = 'SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap' +
       '&LAYERS=' + encodeURIComponent(layerName) +
-      '&STYLES=&FORMAT=' + (svc.format || 'image/png') + '&TRANSPARENT=FALSE' +
-      // 动态背景是不透明底图：透明区域在 AutoCAD 中渲染为黑色，会产生"黑框"
+      // DOM 影像（照片类）用 JPEG 体积降 5-8 倍；不透明底图无需 PNG 透明通道
+      '&STYLES=&FORMAT=image/jpeg&TRANSPARENT=FALSE' +
       '&BBOX=' + bbox + '&WIDTH=' + width + '&HEIGHT=' + height + '&SRS=EPSG:4490';
     var wmsUrl = appendQuery(svc.url, query);
 
@@ -371,15 +403,10 @@
       })
       .then(function(base64) {
         if (!base64) return; // 图片无效，跳过
+        lastBgKey = bgKey;
+        bgCacheSet(bgKey, base64);
         // 发回 C# 端，使用裁剪后的数据范围（而非整个 CAD 视图范围）
-        sendToHost({
-          type: 'backgroundImage',
-          data: base64,
-          minX: bgMinX,
-          minY: bgMinY,
-          width: spanX,
-          height: spanY
-        });
+        sendBackground(base64, bgMinX, bgMinY, spanX, spanY);
       })
       .catch(function(err) {
         console.error('[Adapter] 背景图层 WMS 请求失败:', err);
