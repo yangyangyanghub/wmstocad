@@ -29,8 +29,8 @@
       resolutions: [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
     },
     "EPSG:4526": {
-      name: "CGCS2000 / 3度带 111°E",
-      proj4: "+proj=tmerc +lat_0=0 +lon_0=111 +k=1 +x_0=37500000 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs",
+      name: "CGCS2000 / 3度带 38带 114°E",
+      proj4: "+proj=tmerc +lat_0=0 +lon_0=114 +k=1 +x_0=38500000 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs",
       unit: "米",
       resolutions: [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
     },
