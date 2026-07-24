@@ -425,6 +425,14 @@
         setStatus('正在刷新图层信息...');
         var promises = services.map(function(svc) {
           return fetchCapabilities(svc.url).then(function(caps) {
+            // 按 name 保留旧图层的可见性状态，避免刷新后取消勾选的图层被重置为全选
+            var oldVisible = {};
+            (svc.layers || []).forEach(function(lyr) { oldVisible[lyr.name] = lyr.visible; });
+            caps.layers.forEach(function(lyr) {
+              if (oldVisible[lyr.name] !== undefined) {
+                lyr.visible = oldVisible[lyr.name];
+              }
+            });
             svc.layers = caps.layers;
             svc.name = caps.title || svc.name;
           }).catch(function(err) {
