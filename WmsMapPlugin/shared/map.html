@@ -34,7 +34,11 @@
           <button id="btn-apply-proj" title="应用投影">应用</button>
         </div>
         <div id="current-proj-info" class="proj-info">当前: EPSG:4490</div>
-        <select id="projection-select"></select>
+        <!-- 自定义下拉：原生 select 在 WebView2 嵌入面板中会被宿主抢焦点收起 -->
+        <div class="proj-dropdown" id="proj-dropdown">
+          <button type="button" id="proj-dropdown-btn" class="proj-dropdown-btn">EPSG:4490</button>
+          <ul class="proj-dropdown-list" id="proj-dropdown-list" style="display:none;"></ul>
+        </div>
       </div>
 
       <!-- 出图 -->

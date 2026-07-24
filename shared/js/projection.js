@@ -177,9 +177,9 @@
     infoEl.textContent = '当前: ' + epsg + ' (' + name + ', 单位: ' + unit + ')';
     infoEl.title = proj4def || '';
 
-    // 同步下拉框选中状态
-    var select = document.getElementById('projection-select');
-    if (select) select.value = epsg;
+    // 同步自定义下拉按钮文字
+    var btn = document.getElementById('proj-dropdown-btn');
+    if (btn) btn.textContent = name + ' (' + epsg + ')';
   }
 
   // 从输入框查询并应用投影
@@ -256,7 +256,6 @@
     var queryBtn = document.getElementById('btn-query-epsg');
     var applyBtn = document.getElementById('btn-apply-proj');
     var epsgInput = document.getElementById('epsg-input');
-    var projSelect = document.getElementById('projection-select');
 
     if (queryBtn) {
       queryBtn.addEventListener('click', queryAndApplyProjection);
@@ -269,29 +268,37 @@
         if (e.key === 'Enter') queryAndApplyProjection();
       });
     }
-    if (projSelect) {
-      projSelect.addEventListener('change', function() {
-        var epsg = this.value;
-        if (!epsg) return;
-        var preset = presetProjections[epsg];
-        if (preset) {
-          switchProjection(epsg, preset.proj4, preset.resolutions);
-        }
-      });
-    }
   }
 
-  // 初始化下拉框
+  // 初始化自定义下拉框（原生 select 在 WebView2 嵌入面板中会被宿主抢焦点收起）
   function initProjectionSelect() {
-    var select = document.getElementById('projection-select');
-    if (!select) return;
+    var btn = document.getElementById('proj-dropdown-btn');
+    var list = document.getElementById('proj-dropdown-list');
+    if (!btn || !list) return;
+
     var presets = listPresetProjections();
     presets.forEach(function(p) {
-      var opt = document.createElement('option');
-      opt.value = p.epsg;
-      opt.textContent = p.name + ' (' + p.epsg + ')';
-      if (p.epsg === currentEpsg) opt.selected = true;
-      select.appendChild(opt);
+      var li = document.createElement('li');
+      li.textContent = p.name + ' (' + p.epsg + ')';
+      li.setAttribute('data-epsg', p.epsg);
+      li.addEventListener('click', function(e) {
+        e.stopPropagation();
+        list.style.display = 'none';
+        var preset = presetProjections[p.epsg];
+        if (preset) {
+          switchProjection(p.epsg, preset.proj4, preset.resolutions);
+        }
+      });
+      list.appendChild(li);
+    });
+
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      list.style.display = list.style.display === 'none' ? 'block' : 'none';
+    });
+    // 点击页面其他位置收起列表
+    document.addEventListener('click', function() {
+      list.style.display = 'none';
     });
   }
 
