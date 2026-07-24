@@ -286,7 +286,14 @@
         list.style.display = 'none';
         var preset = presetProjections[p.epsg];
         if (preset) {
-          switchProjection(p.epsg, preset.proj4, preset.resolutions);
+          if (switchProjection(p.epsg, preset.proj4, preset.resolutions)) {
+            // 明确反馈 + 同步输入框，避免用户误以为未生效而点"应用"（空输入报错）
+            setStatus('已切换投影: ' + p.name + ' (' + p.epsg + ')');
+            var input = document.getElementById('epsg-input');
+            if (input) input.value = p.epsg.replace('EPSG:', '');
+          } else {
+            setStatus('投影切换失败: ' + p.epsg, true);
+          }
         }
       });
       list.appendChild(li);
