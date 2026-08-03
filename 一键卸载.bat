@@ -1,36 +1,35 @@
 @echo off
-chcp 65001 >nul 2>&1
 REM ============================================================
-REM  WMS 地图插件 - 一键卸载
-REM  双击运行即可
+REM  WMS ��ͼ��� - һ��ж��
+REM  ˫�����м���
 REM ============================================================
 
 echo.
-echo  ╔══════════════════════════════════════╗
-echo  ║     WMS 地图插件 一键卸载            ║
-echo  ╚══════════════════════════════════════╝
+echo ========================================
+echo   WMS ��ͼ��� һ��ж��
+echo ========================================
 echo.
 
 set "TARGET=%APPDATA%\Autodesk\ApplicationPlugins\WmsMapPlugin.bundle"
 
 if not exist "%TARGET%" (
-  echo  未找到已安装的插件，无需卸载
+  echo δ�ҵ��Ѱ�װ�Ĳ��������ж��
   echo.
   pause
   exit /b 0
 )
 
-echo  正在删除: %TARGET%
+echo ����ɾ��: %TARGET%
 rmdir /s /q "%TARGET%" 2>nul
 
 if exist "%TARGET%" (
-  echo  [错误] 删除失败，请关闭 AutoCAD 后重试
+  echo [����] ɾ��ʧ�ܣ���ر� AutoCAD ������
   pause
   exit /b 1
 )
 
 echo.
-echo  卸载成功！
-echo  重启 AutoCAD 后插件将不再加载
+echo ж�سɹ���
+echo ���� AutoCAD ���������ټ���
 echo.
 pause
