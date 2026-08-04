@@ -57,6 +57,8 @@ foreach ($pair in $syncPairs) {
     Write-Host "  警告: 源目录不存在，跳过: $($pair.Source)" -ForegroundColor Yellow
     if ($pair.Name -eq "autocad bundle") {
       Write-Host "  提示: 请先运行 dotnet build autocad/WmsMapPlugin.sln" -ForegroundColor Yellow
+      # 交付包缺核心编译产物属于打包错误，必须硬失败，不能静默带旧包发布
+      $hasError = $true
     }
     Write-Host ""
     continue
@@ -101,6 +103,36 @@ foreach ($pair in $syncPairs) {
 
   Write-Host ""
 }
+
+# ========================================
+# AutoCAD 源码文件同步（交付副本保留源码副本，需与根级保持一致）
+# ========================================
+Write-Host "[autocad source]" -ForegroundColor Yellow
+$autocadSourceFiles = @(
+  "autocad\WmsMapCommand.cs",
+  "autocad\WmsPanel.cs",
+  "autocad\WmsBridge.cs",
+  "autocad\WmsImageInserter.cs",
+  "autocad\MapBackgroundManager.cs",
+  "autocad\Logger.cs",
+  "autocad\WmsMapPlugin.csproj",
+  "autocad\WmsMapPlugin.sln"
+)
+foreach ($relPath in $autocadSourceFiles) {
+  $srcFile = Join-Path $repoRoot $relPath
+  $dstFile = Join-Path $deliveryRoot $relPath
+  if (Test-Path $srcFile) {
+    if ($PSCmdlet.ShouldProcess($dstFile, "拷贝 $relPath")) {
+      Copy-Item -LiteralPath $srcFile -Destination $dstFile -Force
+    }
+    if ($WhatIfPreference) {
+      Write-Host "  [WhatIf] 将拷贝: $relPath" -ForegroundColor Yellow
+    }
+  } else {
+    Write-Host "  警告: 源码文件不存在，跳过: $relPath" -ForegroundColor Yellow
+  }
+}
+Write-Host ""
 
 if ($hasError) {
   Write-Host "同步完成，但存在错误，请检查上方输出。" -ForegroundColor Red

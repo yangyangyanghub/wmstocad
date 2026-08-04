@@ -35,7 +35,9 @@ if (-not $SkipAutoCAD) {
 
   # 检查 AutoCAD 是否安装
   $autodeskDir = Join-Path $env:APPDATA "Autodesk"
-  if (-not (Test-Path $autodeskDir)) {
+  $autoCadInstalled = (Test-Path $autodeskDir) -or
+    @(Get-ChildItem "C:\Program Files\Autodesk" -Directory -Filter "AutoCAD*" -ErrorAction SilentlyContinue).Count -gt 0
+  if (-not $autoCadInstalled) {
     Write-Host "  警告: 未检测到 AutoCAD 安装，跳过 AutoCAD 插件安装" -ForegroundColor Yellow
   } elseif (-not (Test-Path $sourceBundle)) {
     # 已检测到 AutoCAD 环境但缺 bundle 源目录，属打包/同步缺失，硬失败
