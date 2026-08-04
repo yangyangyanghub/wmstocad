@@ -23,8 +23,8 @@
     }
   ],
   "defaultProjection": {
-    "epsg": "EPSG:4534",
-    "name": "CGCS2000 / 3度带 114°E",
+    "epsg": "EPSG:4526",
+    "name": "CGCS2000 / 3度带 38带 114°E",
     "proj4": "+proj=tmerc +lat_0=0 +lon_0=114 +k=1 +x_0=38500000 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs"
   },
   "availableProjections": [
@@ -35,8 +35,8 @@
       "unit": "度"
     },
     {
-      "epsg": "EPSG:4534",
-      "name": "CGCS2000 / 3度带 114°E",
+      "epsg": "EPSG:4526",
+      "name": "CGCS2000 / 3度带 38带 114°E",
       "proj4": "+proj=tmerc +lat_0=0 +lon_0=114 +k=1 +x_0=38500000 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs",
       "unit": "米"
     },
