@@ -17,6 +17,25 @@ namespace WmsMapPlugin
     private static WmsPanel panel;
     // 动态背景图层管理器
     private static MapBackgroundManager backgroundManager;
+    // 插件加载前的 FRAME 值，退出时恢复，避免永久改变用户的图像边框显示设置
+    private static int? originalFrameValue;
+
+    /// <summary>
+    /// 记录插件首次设置 FRAME 前的系统变量值（供 Terminate 恢复）
+    /// </summary>
+    public static void RecordOriginalFrame()
+    {
+      if (originalFrameValue.HasValue) return;
+      try
+      {
+        originalFrameValue = Convert.ToInt32(
+          Autodesk.AutoCAD.ApplicationServices.Application.GetSystemVariable("FRAME"));
+      }
+      catch
+      {
+        // 无文档上下文或变量不可用时跳过，退出时也不恢复
+      }
+    }
 
     /// <summary>
     /// 插件初始化，AutoCAD 加载插件时调用
@@ -26,6 +45,7 @@ namespace WmsMapPlugin
       Logger.Write("INFO", "========== WMS 插件启动 ==========");
       Logger.Write("INFO", "启动时间: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
       Logger.Write("INFO", "插件版本: 1.0.0");
+      RecordOriginalFrame();
 
       try
       {
@@ -49,6 +69,19 @@ namespace WmsMapPlugin
     {
       Logger.Write("INFO", "关闭时间: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
       Logger.Write("INFO", "========== WMS 插件关闭 ==========");
+
+      // 恢复用户原始的 FRAME 设置
+      try
+      {
+        if (originalFrameValue.HasValue)
+        {
+          Autodesk.AutoCAD.ApplicationServices.Application.SetSystemVariable("FRAME", originalFrameValue.Value);
+        }
+      }
+      catch (Exception ex)
+      {
+        Logger.Write("WARN", "恢复 FRAME 失败: " + ex.Message);
+      }
 
       try
       {

@@ -108,6 +108,7 @@ namespace WmsMapPlugin
         // 5. 隐藏图像边框（FRAME=0 对图纸内所有 RasterImage 生效，含动态背景图）
         try
         {
+          WmsMapCommand.RecordOriginalFrame();
           Application.SetSystemVariable("FRAME", 0);
         }
         catch (Exception ex)
@@ -186,6 +187,14 @@ namespace WmsMapPlugin
         filename = "insert-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".png";
       }
 
+      // 文件名追加时间戳+随机后缀：同名文件再次插入时不会覆盖旧文件，
+      // 避免已插入 RasterImage 因引用文件内容被覆盖而显示成新图
+      string ext = Path.GetExtension(filename);
+      if (string.IsNullOrEmpty(ext)) ext = ".png";
+      string baseName = Path.GetFileNameWithoutExtension(filename);
+      string uniqueName = baseName + "_" + DateTime.Now.ToString("yyyyMMddHHmmssfff")
+        + "_" + Guid.NewGuid().ToString("N").Substring(0, 6) + ext;
+
       // 保存到 DLL 所在目录下的 images/ 文件夹
       string dllDir = Path.GetDirectoryName(typeof(WmsImageInserter).Assembly.Location);
       string imageDir = Path.Combine(dllDir, "images");
@@ -194,7 +203,7 @@ namespace WmsMapPlugin
         Directory.CreateDirectory(imageDir);
       }
 
-      string imagePath = Path.Combine(imageDir, filename);
+      string imagePath = Path.Combine(imageDir, uniqueName);
       File.WriteAllBytes(imagePath, imageBytes);
       return imagePath;
     }

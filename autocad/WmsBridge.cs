@@ -27,7 +27,8 @@ namespace WmsMapPlugin
     private readonly string layersJsonPath;
     private readonly WmsImageInserter imageInserter;
     private FileSystemWatcher layersWatcher;
-    private DateTime lastLayersNotify = DateTime.MinValue;
+    // 文件变化防抖定时器：最后一次事件后 500ms 才读取配置，避免读到半截 JSON
+    private System.Threading.Timer layersDebounceTimer;
 
     /// <summary>
     /// 创建通信桥实例
@@ -229,7 +230,11 @@ namespace WmsMapPlugin
     {
       string base64Data = message.ContainsKey("data") ? message["data"] as string : null;
       string filename = message.ContainsKey("filename") ? message["filename"] as string : "output.png";
-      bool autoInsert = message.ContainsKey("autoInsert") && Convert.ToBoolean(message["autoInsert"]);
+      bool autoInsert = false;
+      if (message.ContainsKey("autoInsert") && message["autoInsert"] != null)
+      {
+        bool.TryParse(message["autoInsert"].ToString(), out autoInsert);
+      }
 
       if (string.IsNullOrEmpty(base64Data))
       {
@@ -518,9 +523,10 @@ namespace WmsMapPlugin
     private void PushViewBoundsScript(double minX, double minY, double maxX, double maxY, string crs)
     {
       if (webView == null || webView.CoreWebView2 == null) return;
+      string crsJson = jsonSerializer.Serialize(crs ?? "EPSG:4490");
       string script = string.Format(
-        "window.wmsAdapter && window.wmsAdapter.onViewChanged && window.wmsAdapter.onViewChanged({0:F6},{1:F6},{2:F6},{3:F6},'{4}');",
-        minX, minY, maxX, maxY, crs);
+        "window.wmsAdapter && window.wmsAdapter.onViewChanged && window.wmsAdapter.onViewChanged({0:F6},{1:F6},{2:F6},{3:F6},{4});",
+        minX, minY, maxX, maxY, crsJson);
       webView.CoreWebView2.ExecuteScriptAsync(script);
     }
 
@@ -548,6 +554,8 @@ namespace WmsMapPlugin
         };
 
         layersWatcher.Changed += OnLayersFileChanged;
+        layersDebounceTimer = new System.Threading.Timer(
+          _ => SendLayersConfig(), null, System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
         Logger.Write("INFO", "已启动 layers.json 文件监控: " + layersJsonPath);
       }
       catch (Exception ex)
@@ -557,25 +565,14 @@ namespace WmsMapPlugin
     }
 
     /// <summary>
-    /// layers.json 文件变化回调，防抖后重新发送配置到前端
+    /// layers.json 文件变化回调：重置防抖定时器，最后一次变化后 500ms 再读取发送
     /// </summary>
     private void OnLayersFileChanged(object sender, FileSystemEventArgs e)
     {
-      // 防抖：1 秒内只触发一次
-      if ((DateTime.Now - lastLayersNotify).TotalSeconds < 1)
+      // 定时器回调已包含 try/catch（SendLayersConfig 内部处理异常）
+      if (layersDebounceTimer != null)
       {
-        return;
-      }
-      lastLayersNotify = DateTime.Now;
-
-      try
-      {
-        Logger.Write("INFO", "检测到 layers.json 变化，自动刷新配置");
-        SendLayersConfig();
-      }
-      catch (Exception ex)
-      {
-        Logger.Write("ERROR", "自动刷新配置失败: " + ex.Message);
+        layersDebounceTimer.Change(500, System.Threading.Timeout.Infinite);
       }
     }
 
@@ -593,6 +590,11 @@ namespace WmsMapPlugin
           layersWatcher.Dispose();
           layersWatcher = null;
           Logger.Write("INFO", "layers.json 文件监控已停止");
+        }
+        if (layersDebounceTimer != null)
+        {
+          layersDebounceTimer.Dispose();
+          layersDebounceTimer = null;
         }
       }
       catch (Exception ex)

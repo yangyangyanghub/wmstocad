@@ -48,8 +48,9 @@ namespace WmsMapPlugin
     private List<WmsLayerInfo> activeLayers;
     private bool disposed;
     private ObjectId rasterImageId;
-    private ObjectId rasterImageDefId;
     private string currentImagePath;
+    // 删除失败的历史背景图引用，后续更新时重试清理，避免实体残留在模型空间
+    private readonly List<ObjectId> staleImageIds = new List<ObjectId>();
 
     // 命令队列（线程安全）
     private readonly object queueLock = new object();
@@ -69,7 +70,6 @@ namespace WmsMapPlugin
       doc = document;
       activeLayers = new List<WmsLayerInfo>();
       rasterImageId = ObjectId.Null;
-      rasterImageDefId = ObjectId.Null;
       currentImagePath = null;
       viewDirty = false;
       pendingImage = null;
@@ -81,7 +81,38 @@ namespace WmsMapPlugin
       // Application.Idle 在主线程触发，处理所有数据库操作
       Autodesk.AutoCAD.ApplicationServices.Application.Idle += OnApplicationIdle;
 
+      // 多文档环境：切换活动文档时重新绑定 ViewChanged，避免背景更新到旧文档
+      Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.DocumentActivated += OnDocumentActivated;
+
       Logger.Write("INFO", "MapBackgroundManager 已初始化（Idle + 命令队列模式）");
+    }
+
+    /// <summary>
+    /// 活动文档切换回调：移除旧文档背景并重新绑定新文档
+    /// </summary>
+    private void OnDocumentActivated(object sender, DocumentCollectionEventArgs e)
+    {
+      if (disposed) return;
+      var newDoc = e.Document;
+      if (newDoc == null || ReferenceEquals(newDoc, doc)) return;
+
+      Logger.Write("INFO", "活动文档切换，重新绑定背景管理器");
+      lock (queueLock) { pendingImage = null; viewDirty = false; }
+
+      // 移除旧文档中的动态背景
+      RemoveRasterImage(doc);
+
+      if (doc != null)
+      {
+        try { doc.ViewChanged -= OnViewChanged; } catch { }
+      }
+      doc = newDoc;
+      doc.ViewChanged += OnViewChanged;
+      rasterImageId = ObjectId.Null;
+      currentImagePath = null;
+
+      lock (queueLock) { viewDirty = true; }
+      Logger.Write("INFO", "背景管理器已绑定到新文档");
     }
 
     /// <summary>
@@ -230,39 +261,38 @@ namespace WmsMapPlugin
       // 步骤1：删除旧 RasterImage + RasterImageDef（单独事务）
       if (rasterImageId.IsValid && !rasterImageId.IsNull)
       {
-        try
+        if (TryRemoveRasterImage(rasterImageId))
         {
-          using (DocumentLock docLock = doc.LockDocument())
-          using (Transaction tr = db.TransactionManager.StartTransaction())
+          rasterImageId = ObjectId.Null;
+
+          // 步骤2：删除旧图片文件（RasterImageDef 已删除，文件应已解锁）
+          if (!string.IsNullOrEmpty(currentImagePath) && File.Exists(currentImagePath))
           {
-            RasterImage oldImage = (RasterImage)tr.GetObject(rasterImageId, OpenMode.ForWrite);
-            ObjectId oldDefId = oldImage.ImageDefId;
-            oldImage.Erase();
-            // 同时删除 RasterImageDef，避免图像字典膨胀
-            if (oldDefId.IsValid && !oldDefId.IsNull)
-            {
-              try { ((RasterImageDef)tr.GetObject(oldDefId, OpenMode.ForWrite)).Erase(); }
-              catch { }
-            }
-            tr.Commit();
+            try { File.Delete(currentImagePath); }
+            catch { /* 文件可能仍被锁定，忽略 */ }
           }
+          currentImagePath = null;
         }
-        catch (Exception ex)
+        else
         {
-          Logger.Write("WARN", "删除旧 RasterImage 失败: " + ex.Message);
+          // 删除失败：保留引用进待清理队列，下次更新重试，避免失去追踪后残留
+          staleImageIds.Add(rasterImageId);
+          rasterImageId = ObjectId.Null;
+          Logger.Write("WARN", "删除旧背景图失败，已加入待清理队列");
         }
-        rasterImageId = ObjectId.Null;
-        rasterImageDefId = ObjectId.Null;
       }
 
-      // 步骤2：删除旧图片文件（RasterImageDef 已删除，文件应已解锁）
-      if (!string.IsNullOrEmpty(currentImagePath) && File.Exists(currentImagePath))
+      // 重试清理历史残留背景图
+      for (int i = staleImageIds.Count - 1; i >= 0; i--)
       {
-        try { File.Delete(currentImagePath); }
-        catch { /* 文件可能仍被锁定，忽略 */ }
+        if (TryRemoveRasterImage(staleImageIds[i]))
+        {
+          staleImageIds.RemoveAt(i);
+        }
       }
 
       // 步骤3：创建新 RasterImageDef + RasterImage
+      bool commitSucceeded = false;
       using (DocumentLock docLock = doc.LockDocument())
       using (Transaction tr = db.TransactionManager.StartTransaction())
       {
@@ -318,13 +348,10 @@ namespace WmsMapPlugin
             Logger.Write("INFO", "AssociateRasterDef 完成");
 
             rasterImageId = rasterImage.ObjectId;
-            rasterImageDefId = imageDefId;
           }
           currentImagePath = imagePath;
           tr.Commit();
-          // 隐藏图像边框，避免背景图外框与插入影像的框叠加
-          try { Application.SetSystemVariable("FRAME", 0); } catch { }
-          Logger.Write("INFO", "事务已提交，背景图层更新成功");
+          commitSucceeded = true;
         }
         catch (Autodesk.AutoCAD.Runtime.Exception ex)
         {
@@ -336,6 +363,22 @@ namespace WmsMapPlugin
           Logger.Write("ERROR", "创建 RasterImage 失败: " + ex.Message + "\n堆栈: " + ex.StackTrace);
           tr.Abort();
         }
+      }
+
+      // 锁与事务均已释放后再设置 FRAME，避免在事务/锁内调用系统变量被拒绝
+      if (commitSucceeded)
+      {
+        WmsMapCommand.RecordOriginalFrame();
+        try
+        {
+          Application.SetSystemVariable("FRAME", 0);
+          Logger.Write("INFO", "已设置 FRAME=0 隐藏图像边框");
+        }
+        catch (Exception ex)
+        {
+          Logger.Write("WARN", "设置 FRAME=0 失败: " + ex.Message);
+        }
+        Logger.Write("INFO", "事务已提交，背景图层更新成功");
       }
     }
 
@@ -360,19 +403,21 @@ namespace WmsMapPlugin
     }
 
     /// <summary>
-    /// 移除背景图层（主线程安全调用）
+    /// 在独立事务中删除指定 RasterImage 及其 RasterImageDef
     /// </summary>
-    private void RemoveRasterImage()
+    private bool TryRemoveRasterImage(ObjectId imageId, Document targetDoc = null)
     {
-      if (doc == null || !rasterImageId.IsValid || rasterImageId.IsNull) return;
+      if (targetDoc == null) targetDoc = doc;
+      if (targetDoc == null || !imageId.IsValid || imageId.IsNull) return true;
       try
       {
-        using (DocumentLock docLock = doc.LockDocument())
-        using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+        using (DocumentLock docLock = targetDoc.LockDocument())
+        using (Transaction tr = targetDoc.Database.TransactionManager.StartTransaction())
         {
-          RasterImage img = (RasterImage)tr.GetObject(rasterImageId, OpenMode.ForWrite);
+          RasterImage img = (RasterImage)tr.GetObject(imageId, OpenMode.ForWrite);
           ObjectId defId = img.ImageDefId;
           img.Erase();
+          // 同时删除 RasterImageDef，避免图像字典膨胀
           if (defId.IsValid && !defId.IsNull)
           {
             try { ((RasterImageDef)tr.GetObject(defId, OpenMode.ForWrite)).Erase(); }
@@ -380,21 +425,41 @@ namespace WmsMapPlugin
           }
           tr.Commit();
         }
-        rasterImageId = ObjectId.Null;
-        rasterImageDefId = ObjectId.Null;
-
-        // 删除图片文件
-        if (!string.IsNullOrEmpty(currentImagePath) && File.Exists(currentImagePath))
-        {
-          try { File.Delete(currentImagePath); } catch { }
-          currentImagePath = null;
-        }
-        Logger.Write("INFO", "背景图层已移除");
+        return true;
       }
       catch (Exception ex)
       {
-        Logger.Write("WARN", "移除背景图层失败: " + ex.Message);
+        Logger.Write("WARN", "删除 RasterImage 失败: " + ex.Message);
+        return false;
       }
+    }
+
+    /// <summary>
+    /// 移除背景图层（主线程安全调用）
+    /// </summary>
+    private void RemoveRasterImage(Document targetDoc = null)
+    {
+      if (targetDoc == null) targetDoc = doc;
+      if (targetDoc == null || !rasterImageId.IsValid || rasterImageId.IsNull) return;
+
+      if (!TryRemoveRasterImage(rasterImageId, targetDoc))
+      {
+        // 删除失败：保留引用进待清理队列，避免残留后失去追踪
+        staleImageIds.Add(rasterImageId);
+        rasterImageId = ObjectId.Null;
+        Logger.Write("WARN", "移除背景图层失败，已加入待清理队列");
+        return;
+      }
+
+      rasterImageId = ObjectId.Null;
+
+      // 删除图片文件
+      if (!string.IsNullOrEmpty(currentImagePath) && File.Exists(currentImagePath))
+      {
+        try { File.Delete(currentImagePath); } catch { }
+        currentImagePath = null;
+      }
+      Logger.Write("INFO", "背景图层已移除");
     }
 
     public void Refresh()
@@ -408,6 +473,11 @@ namespace WmsMapPlugin
       disposed = true;
       try { if (doc != null) doc.ViewChanged -= OnViewChanged; } catch { }
       try { Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnApplicationIdle; } catch { }
+      try
+      {
+        Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.DocumentActivated -= OnDocumentActivated;
+      }
+      catch { }
       try { RemoveRasterImage(); } catch { }
 
       // 清理 images 目录中残留的临时文件
@@ -417,7 +487,8 @@ namespace WmsMapPlugin
         string imageDir = Path.Combine(dllDir, "images");
         if (Directory.Exists(imageDir))
         {
-          foreach (string f in Directory.GetFiles(imageDir, "bg_*.png"))
+          // 背景图可能是 PNG 或 JPEG，统一清理
+          foreach (string f in Directory.GetFiles(imageDir, "bg_*"))
           {
             try { File.Delete(f); } catch { }
           }
