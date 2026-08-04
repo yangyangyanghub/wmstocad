@@ -6,6 +6,8 @@
 
   // 检查是否在 WebView2 宿主环境中
   var isHosted = !!(window.chrome && window.chrome.webview);
+  // 检查是否嵌入 iframe（WPS 任务窗格场景）
+  var isInIframe = window.parent !== window;
 
   // 更新状态栏
   function setStatus(msg, isError) {
@@ -18,15 +20,26 @@
 
   // 发送消息到 C# 宿主
   function sendToHost(message) {
-    if (!isHosted) {
-      console.log('[Adapter] 非宿主环境，消息未发送:', message);
+    if (isHosted) {
+      try {
+        var json = typeof message === 'string' ? message : JSON.stringify(message);
+        window.chrome.webview.postMessage(json);
+      } catch (e) {
+        console.error('[Adapter] 发送消息失败:', e);
+      }
       return;
     }
-    try {
-      var json = typeof message === 'string' ? message : JSON.stringify(message);
-      window.chrome.webview.postMessage(json);
-    } catch (e) {
-      console.error('[Adapter] 发送消息失败:', e);
+    // WPS 任务窗格：通过 postMessage 转发给宿主页面
+    if (isInIframe) {
+      try {
+        window.parent.postMessage(message, '*');
+      } catch (e) {
+        console.error('[Adapter] 向宿主页面发送消息失败:', e);
+      }
+      return;
+    }
+    if (typeof message !== 'string') {
+      console.log('[Adapter] 非宿主环境，消息未发送:', message);
     }
   }
 
@@ -94,7 +107,7 @@
 
     // 如果是经纬度坐标系（EPSG:4490），直接用经纬度作为坐标
     // 单位是度，CAD 中数值很小，但仍然可以作为坐标使用
-    // 如果是投影坐标系（如 EPSG:4534），用 proj4js 转换为米
+    // 如果是投影坐标系（如 EPSG:4526），用 proj4js 转换为米
     if (epsgCode === 'EPSG:4490') {
       console.warn('[Adapter] 当前为经纬度坐标系，建议切换到投影坐标系以获得真实米制坐标');
       return {
@@ -184,34 +197,25 @@
     // 存储到全局供其他模块使用
     window.wmsHostConfig = configData;
 
-    // 填充图层下拉框
-    var select = document.getElementById('layer-select');
-    if (select) {
-      select.innerHTML = '';
-      configData.services.forEach(function(service) {
-        if (!Array.isArray(service.layers)) return;
-        service.layers.forEach(function(layer) {
-          var opt = document.createElement('option');
-          opt.value = service.id + ':' + layer.name;
-          opt.textContent = service.name + ' - ' + layer.title;
-          select.appendChild(opt);
-        });
-      });
-      if (select.options.length > 0) {
-        select.selectedIndex = 0;
-      }
-    }
-
-    // 如果 wmsLayers 模块已加载，触发图层切换
-    if (window.wmsWms && select && select.value) {
-      var parts = select.value.split(':');
-      window.wmsWms.switchLayer(parts[0], parts[1]).catch(function(err) {
-        console.error('[Adapter] 切换图层失败:', err);
-      });
+    // 把宿主配置应用到 layers.js（替换服务列表并加载可见图层）
+    if (window.wmsLayers && window.wmsLayers.applyHostConfig) {
+      window.wmsLayers.applyHostConfig(configData);
+    } else {
+      console.warn('[Adapter] wmsLayers.applyHostConfig 不可用，配置未应用');
     }
 
     setStatus('配置已从宿主加载');
     sendLog('INFO', '图层配置已从 C# 宿主加载，服务数: ' + configData.services.length);
+  }
+
+  // 处理宿主页面通过 postMessage 发来的消息（WPS 任务窗格场景）
+  function handleHostPostMessage(event) {
+    var data = event.data;
+    if (!data || typeof data !== 'object') return;
+
+    if (data.type === 'layers-config' && data.data) {
+      handleConfig(data.data);
+    }
   }
 
   // 处理图片保存成功消息
@@ -247,6 +251,10 @@
       sendToHost({ type: 'ready' });
       sendLog('INFO', '前端已就绪');
       console.log('[Adapter] 已发送 ready 消息到宿主');
+    } else if (isInIframe) {
+      // WPS 任务窗格：通知宿主页面地图已加载完成，隐藏加载遮罩
+      window.parent.postMessage({ type: 'map-ready' }, '*');
+      console.log('[Adapter] 已发送 map-ready 消息到宿主页面');
     } else {
       console.log('[Adapter] 非宿主环境，跳过 ready 消息');
     }
@@ -256,6 +264,7 @@
   var lastBgKey = null;      // 上次已发送的视图 key（相同则跳过，打断"插入背景→ViewChanged→再请求"自触发循环）
   var bgCache = new Map();   // key -> base64，平移回看时秒出
   var BG_CACHE_MAX = 15;
+  var latestBgKey = null;    // 最近一次发起的背景请求 key，用于丢弃乱序返回的旧响应
 
   function bgCacheGet(key) {
     var v = bgCache.get(key);
@@ -286,6 +295,8 @@
 
     // 用 proj4js 把 CAD 坐标转为经纬度（EPSG:4490）
     var srcCrs = crs || 'EPSG:4490';
+    // 是否为经纬度单位（度），用于背景图尺寸换算
+    var isDegree = srcCrs === 'EPSG:4490' || srcCrs === 'EPSG:4326';
     var swLng, swLat, neLng, neLat;
 
     if (srcCrs === 'EPSG:4490') {
@@ -316,17 +327,36 @@
       return;
     }
 
-    // 与图层数据范围（LatLonBoundingBox）求交集：只请求有数据的区域，
+    // 按服务分组：同一服务的多个图层合并到同一个 WMS GetMap 请求
+    // 多个不同服务的图层无法合并请求，只取第一个服务（记录警告）
+    var groups = {};
+    visibleLayers.forEach(function(item) {
+      if (!groups[item.service.id]) groups[item.service.id] = [];
+      groups[item.service.id].push(item);
+    });
+    var groupIds = Object.keys(groups);
+    var group = groups[groupIds[0]];
+    if (groupIds.length > 1) {
+      sendLog('WARN', '多个 WMS 服务的图层叠加时，动态背景仅显示第一个服务: ' + group[0].service.id);
+    }
+    var svc = group[0].service;
+    var layerName = group.map(function(item) { return item.layer.name; }).join(',');
+
+    // 与所有图层数据范围（LatLonBoundingBox）求交集：只请求有数据的区域，
     // 避免视图远大于图层覆盖时产生大面积空白背景
-    var item = visibleLayers[0];
-    var svc = item.service;
-    var layerName = item.layer.name;
-    var lb = item.layer.bbox;
-    if (lb && lb.minx != null && lb.miny != null && lb.maxx != null && lb.maxy != null) {
-      var iSwLng = Math.max(swLng, lb.minx);
-      var iSwLat = Math.max(swLat, lb.miny);
-      var iNeLng = Math.min(neLng, lb.maxx);
-      var iNeLat = Math.min(neLat, lb.maxy);
+    var hasLayerBbox = false;
+    var iSwLng = -180, iSwLat = -90, iNeLng = 180, iNeLat = 90;
+    group.forEach(function(item) {
+      var lb = item.layer.bbox;
+      if (lb && lb.minx != null && lb.miny != null && lb.maxx != null && lb.maxy != null) {
+        hasLayerBbox = true;
+        iSwLng = Math.max(iSwLng, lb.minx);
+        iSwLat = Math.max(iSwLat, lb.miny);
+        iNeLng = Math.min(iNeLng, lb.maxx);
+        iNeLat = Math.min(iNeLat, lb.maxy);
+      }
+    });
+    if (hasLayerBbox) {
       if (iNeLng <= iSwLng || iNeLat <= iSwLat) {
         console.log('[Adapter] 视图与图层数据范围不相交，跳过背景更新');
         return;
@@ -350,9 +380,11 @@
     }
 
     // 计算图片尺寸（按数据范围保持宽高比）
+    // 经纬度跨度先换算为米（1 度约 111320 米），避免度数被直接当像素导致分辨率过低
     var spanX = Math.abs(bgMaxX - bgMinX);
     var spanY = Math.abs(bgMaxY - bgMinY);
-    var width = Math.min(1024, Math.max(256, Math.round(spanX)));
+    var spanXForPixel = isDegree ? spanX * 111320 : spanX;
+    var width = Math.min(1024, Math.max(256, Math.round(spanXForPixel)));
     var height = Math.min(768, Math.max(192, Math.round(width * spanY / spanX)));
 
     var bbox = swLng.toFixed(6) + ',' + swLat.toFixed(6) + ',' + neLng.toFixed(6) + ',' + neLat.toFixed(6);
@@ -375,6 +407,7 @@
     var wmsUrl = appendQuery(svc.url, query);
 
     console.log('[Adapter] 背景图层 WMS 请求:', wmsUrl);
+    latestBgKey = bgKey;
 
     // 请求 WMS 影像
     fetch(wmsUrl)
@@ -403,12 +436,14 @@
       })
       .then(function(base64) {
         if (!base64) return; // 图片无效，跳过
+        if (bgKey !== latestBgKey) return; // 已有更新的视图请求，丢弃旧响应
         lastBgKey = bgKey;
         bgCacheSet(bgKey, base64);
         // 发回 C# 端，使用裁剪后的数据范围（而非整个 CAD 视图范围）
         sendBackground(base64, bgMinX, bgMinY, spanX, spanY);
       })
       .catch(function(err) {
+        if (bgKey !== latestBgKey) return; // 旧请求的失败不干扰最新视图
         console.error('[Adapter] 背景图层 WMS 请求失败:', err);
         sendLog('ERROR', '动态背景 WMS 请求失败: ' + (err.message || err));
       });
@@ -512,6 +547,9 @@
     onReady();
     bindOutputEvents();
   }
+
+  // 监听宿主页面 postMessage（WPS 任务窗格配置注入）
+  window.addEventListener('message', handleHostPostMessage);
 
   console.log('[Adapter] 初始化完成, 宿主环境:', isHosted);
 

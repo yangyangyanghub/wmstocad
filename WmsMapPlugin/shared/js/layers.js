@@ -238,6 +238,72 @@
     return result;
   }
 
+  // 校验服务配置列表，返回有效服务和无效数量
+  // 宿主配置注入与本地加载共用，避免无效配置破坏图层状态
+  function validateServices(input) {
+    var list = Array.isArray(input) ? input : [];
+    var valid = list.filter(function(svc) {
+      return svc && svc.url && Array.isArray(svc.layers) && svc.layers.length > 0;
+    });
+    return {
+      valid: valid,
+      invalidCount: list.length - valid.length
+    };
+  }
+
+  // 应用宿主下发的配置（AutoCAD 热更新 / WPS 刷新配置）
+  // 按 serviceId:layerName 保留旧可见性，移除已不存在的图层，加载新配置中可见的图层
+  function applyHostConfig(config) {
+    if (!config || !Array.isArray(config.services)) return false;
+
+    var map = window.wmsMap;
+    var oldVisible = {};
+    var newKeys = {};
+
+    services.forEach(function(svc) {
+      (svc.layers || []).forEach(function(lyr) {
+        oldVisible[svc.id + ':' + lyr.name] = lyr.visible;
+      });
+    });
+    config.services.forEach(function(svc) {
+      (svc.layers || []).forEach(function(lyr) {
+        newKeys[svc.id + ':' + lyr.name] = true;
+      });
+    });
+
+    // 移除配置中已不存在的 Leaflet 图层
+    Object.keys(layerElements).forEach(function(key) {
+      if (!newKeys[key]) {
+        if (layerElements[key].leafletLayer && map) {
+          map.removeLayer(layerElements[key].leafletLayer);
+        }
+        delete layerElements[key];
+      }
+    });
+
+    services = config.services;
+
+    // 按名称保留旧可见性，新图层默认可见（visible 未定义视为可见）
+    services.forEach(function(svc) {
+      (svc.layers || []).forEach(function(lyr) {
+        var old = oldVisible[svc.id + ':' + lyr.name];
+        if (old !== undefined) lyr.visible = old;
+      });
+    });
+
+    saveToStorage();
+    renderLayerList();
+
+    services.forEach(function(svc) {
+      (svc.layers || []).forEach(function(lyr) {
+        if (lyr.visible !== false) toggleLayer(svc.id, lyr.name, true);
+      });
+    });
+
+    console.log('[Layers] 已应用宿主配置，服务数: ' + services.length);
+    return true;
+  }
+
   // 通知 C# 端图层可见性已变化（用于 TransientManager 动态背景刷新）
   function notifyLayersChanged() {
     if (!window.wmsAdapter || !window.wmsAdapter.isHosted) return;
@@ -586,6 +652,8 @@
     getServices: getServices,
     renderLayerList: renderLayerList,
     fetchCapabilities: fetchCapabilities,
+    validateServices: validateServices,
+    applyHostConfig: applyHostConfig,
     getDefaultServices: function() { return [JSON.parse(JSON.stringify(DEFAULT_SERVICE))]; }
   };
 

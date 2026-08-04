@@ -10,12 +10,6 @@
       unit: "度",
       resolutions: [0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001, 0.0005, 0.0002, 0.0001, 0.00005, 0.00002, 0.00001]
     },
-    "EPSG:4534": {
-      name: "CGCS2000 / 3度带 114°E",
-      proj4: "+proj=tmerc +lat_0=0 +lon_0=114 +k=1 +x_0=38500000 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs",
-      unit: "米",
-      resolutions: [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
-    },
     "EPSG:4535": {
       name: "CGCS2000 / 3度带 117°E",
       proj4: "+proj=tmerc +lat_0=0 +lon_0=117 +k=1 +x_0=39500000 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs",

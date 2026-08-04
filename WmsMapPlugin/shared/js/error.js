@@ -122,9 +122,25 @@
   }
 
   function sendToHost(type, data) {
-    if (!isWebView2()) return;
+    // log 消息按宿主约定发送顶层 level/message 字段（C# HandleLog / WPS main.js 均读取这两个字段）
+    var message;
+    if (type === 'log') {
+      message = {
+        type: 'log',
+        level: data.level,
+        message: '[' + data.module + '] ' + data.message
+      };
+    } else {
+      message = { type: type, data: data };
+    }
+
     try {
-      window.chrome.webview.postMessage({ type: type, data: data });
+      if (isWebView2()) {
+        window.chrome.webview.postMessage(message);
+      } else if (window.parent !== window) {
+        // WPS 任务窗格：转发给宿主页面
+        window.parent.postMessage(message, '*');
+      }
     } catch (e) {
       // 通信失败不影响前端功能
     }

@@ -1,5 +1,5 @@
 // WMS Map Plugin - Output Module
-// GetMap 出图与截图功能
+// GetMap 出图功能
 
 (function() {
   'use strict';
@@ -17,18 +17,27 @@
     }
   }
 
-  function getCurrentService() {
+  // 获取当前出图目标：第一个服务及其所有可见图层（同服务多图层合并到一个 WMS 请求）
+  function getCurrentTarget() {
     if (!window.wmsLayers) return null;
     var visibleLayers = window.wmsLayers.getVisibleLayers();
     if (visibleLayers.length === 0) return null;
-    return visibleLayers[0].service;
-  }
 
-  function getCurrentLayerName() {
-    if (!window.wmsLayers) return '0';
-    var visibleLayers = window.wmsLayers.getVisibleLayers();
-    if (visibleLayers.length === 0) return '0';
-    return visibleLayers[0].layer.name || '0';
+    // 按服务分组，取第一个服务的所有可见图层
+    var groups = {};
+    visibleLayers.forEach(function(item) {
+      if (!groups[item.service.id]) groups[item.service.id] = [];
+      groups[item.service.id].push(item);
+    });
+    var groupIds = Object.keys(groups);
+    var group = groups[groupIds[0]];
+    if (groupIds.length > 1) {
+      hostLog('WARN', '多个 WMS 服务的图层叠加时，出图仅包含第一个服务: ' + group[0].service.id);
+    }
+    return {
+      service: group[0].service,
+      layerNames: group.map(function(item) { return item.layer.name || '0'; })
+    };
   }
 
   function hostLog(level, message) {
@@ -159,16 +168,17 @@
 
     hostLog('INFO', 'getMapImage: 地图对象就绪');
 
-    var service = getCurrentService();
-    if (!service) {
+    var target = getCurrentTarget();
+    if (!target) {
       var hasLayers = !!(window.wmsLayers && window.wmsLayers.getVisibleLayers().length);
       hostLog('WARN', 'getMapImage: 服务不可用 hasVisibleLayers=' + hasLayers);
       return Promise.reject(new Error('当前图层服务不可用'));
     }
+    var service = target.service;
 
     hostLog('INFO', 'getMapImage: 服务就绪, url=' + (service.url || 'undefined'));
 
-    var layerName = getCurrentLayerName();
+    var layerNames = target.layerNames.join(',');
     var bounds = map.getBounds();
     var sw = bounds.getSouthWest();
     var ne = bounds.getNorthEast();
@@ -179,7 +189,7 @@
     var query = 'SERVICE=WMS' +
       '&VERSION=1.1.1' +
       '&REQUEST=GetMap' +
-      '&LAYERS=' + encodeURIComponent(layerName) +
+      '&LAYERS=' + encodeURIComponent(layerNames) +
       '&SRS=EPSG:4490' +
       '&BBOX=' + bbox +
       '&WIDTH=' + IMG_WIDTH +
@@ -191,7 +201,7 @@
     console.log('[Output] GetMap URL:', url);
     hostLog('INFO', 'GetMap URL: ' + url);
 
-    var qaContext = { layerName: layerName, bbox: bbox };
+    var qaContext = { layerName: layerNames, bbox: bbox };
 
     return doGetMap(url, 0, qaContext)
       .then(function(base64) {
@@ -200,77 +210,9 @@
       });
   }
 
-  function screenshotImage() {
-    var mapEl = document.getElementById('map');
-    if (!mapEl) {
-      return Promise.reject(new Error('地图容器未找到'));
-    }
-
-    if (typeof html2canvas === 'undefined') {
-      return Promise.reject(new Error('html2canvas 库未加载'));
-    }
-
-    setStatus('正在截图...');
-
-    return html2canvas(mapEl, {
-      useCORS: true,
-      allowTaint: true,
-      width: mapEl.clientWidth,
-      height: mapEl.clientHeight
-    }).then(function(canvas) {
-      var base64 = canvas.toDataURL('image/png');
-      setStatus('截图完成');
-      return base64;
-    });
-  }
-
-  function bindEvents() {
-    var btnGetmap = document.getElementById('btn-getmap');
-    var btnScreenshot = document.getElementById('btn-screenshot');
-
-    if (btnGetmap) {
-      btnGetmap.addEventListener('click', function() {
-        window.wmsGetMapPromise = getMapImage();
-        window.wmsGetMapPromise
-          .then(function(base64) {
-            console.log('[Output] GetMap 出图成功，长度:', base64.length);
-          })
-          .catch(function(err) {
-            console.error('[Output] GetMap 出图失败:', err.message || err);
-            if (err && err.message && err.message.indexOf('超时') !== -1) {
-              setStatus('出图超时，请重试', true);
-            } else if (err && err.message === '服务返回空图片') {
-              setStatus('服务返回空图片', true);
-            } else {
-              setStatus('GetMap 出图失败，请检查网络连接', true);
-            }
-          });
-      });
-    }
-
-    if (btnScreenshot) {
-      btnScreenshot.addEventListener('click', function() {
-        screenshotImage()
-          .then(function(base64) {
-            console.log('[Output] 截图成功，长度:', base64.length);
-          })
-          .catch(function(err) {
-            console.error('[Output] 截图失败:', err.message || err);
-            setStatus('截图失败，请使用 GetMap 出图', true);
-          });
-      });
-    }
-  }
-
   window.getMapImageBase64 = function() {
     return getMapImage();
   };
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bindEvents);
-  } else {
-    bindEvents();
-  }
 
   console.log('[Output] module initialized');
 })();

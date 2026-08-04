@@ -48,35 +48,7 @@
   window.wmsMap = map;
   window.wmsCrs = crs4490;
 
-  // 5. 等待图层配置加载后，通过 wms.js 加载默认图层
-  function loadDefaultLayer() {
-    if (window.wmsLayers && window.wmsLayers.getConfig() && window.wmsWms) {
-      var cfg = window.wmsLayers.getConfig();
-      if (cfg.services.length > 0 && cfg.services[0].layers.length > 0) {
-        var serviceId = cfg.services[0].id;
-        var layerName = cfg.services[0].layers[0].name;
-        window.wmsWms.switchLayer(serviceId, layerName)
-          .then(function() {
-            console.log('Default WMS layer loaded:', serviceId + '/' + layerName);
-          })
-          .catch(function(err) {
-            console.error('默认图层加载失败:', err);
-          });
-      }
-      return true;
-    }
-    return false;
-  }
-
-  // 轮询等待配置就绪（最多 5 秒）
-  if (!loadDefaultLayer()) {
-    var waitTimer = setInterval(function() {
-      if (loadDefaultLayer()) {
-        clearInterval(waitTimer);
-      }
-    }, 100);
-    setTimeout(function() { clearInterval(waitTimer); }, 5000);
-  }
+  // 5. 默认图层由 layers.js 在配置加载后自动加载，这里不再重复处理
 
   // 6. 初始化日志
   console.log("Map initialized with EPSG:4490");

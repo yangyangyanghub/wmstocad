@@ -36,22 +36,6 @@
     return L.tileLayer.wms(service.url, wmsParams);
   }
 
-  // 探测 WMS 服务可达性（5s 超时）
-  function probeService(url, timeoutMs) {
-    timeoutMs = timeoutMs || 5000;
-    var controller = null;
-    if (typeof AbortController !== 'undefined') {
-      controller = new AbortController();
-    }
-    var timeoutId = setTimeout(function() {
-      if (controller) controller.abort();
-    }, timeoutMs);
-
-    return fetch(url, controller ? { signal: controller.signal } : {})
-      .then(function(resp) { clearTimeout(timeoutId); return resp; })
-      .catch(function(err) { clearTimeout(timeoutId); throw err; });
-  }
-
   // 刷新所有可见图层（投影切换后调用）
   function refreshAllLayers() {
     if (!window.wmsLayers) return;
@@ -69,7 +53,6 @@
   // 暴露全局 API
   window.wmsWms = {
     createWmsLayer: createWmsLayer,
-    probeService: probeService,
     refreshAllLayers: refreshAllLayers
   };
 
